@@ -591,13 +591,23 @@ function getData() {
   var sh = getSheet();
   var rows = sh.getDataRange().getValues();
   if (rows.length < 2) return [];
-  return rows.slice(1).map(function(r) {
+  // Load deleted slip numbers so we never return them to any device
+  var deletedNums = getDeleted();
+  var dset = {};
+  deletedNums.forEach(function(s){ dset[String(s)] = 1; });
+  var entries = rows.slice(1).map(function(r) {
     if (r[10]) { try { return JSON.parse(r[10]); } catch(e){} }
     return {
       slip:r[0], date:r[1], cname:r[2], phone:r[3]||'', staff:r[4]||'',
       items:[{name:r[5], qty:1, serials:[{sn:r[6],remark:'',status:r[7]||'PENDING',dateGiven:r[8]||'',received:''}]}],
       status:r[7]||'PENDING', dateGiven:r[8]||'', remarks:r[9]||''
     };
+  });
+  // Strip deleted, corrupt, and empty entries
+  return entries.filter(function(e){
+    if(!e || !e.slip || !e.cname) return false;
+    if(dset[String(e.slip)]) return false;
+    return true;
   });
 }
 
@@ -666,11 +676,17 @@ function _colorRow(sh, r, status) {
 }
 
 // Smart push — only write rows that are new or changed, never wipe the sheet
+// Also skips any slip in the deleted list and removes them from the sheet if found
 function smartPush(entries) {
   var sh = getSheet();
   var vals = sh.getDataRange().getValues();
 
-  // Build a map of what's currently in Sheets: slip# → {rowIndex, jsonHash}
+  // Load deleted list once — used to skip and clean
+  var deletedNums = getDeleted();
+  var dset = {};
+  deletedNums.forEach(function(s){ dset[String(s)] = 1; });
+
+  // Build a map of what's currently in Sheets: slip# → {rowIndex, json}
   var sheetMap = {};
   for (var i = 1; i < vals.length; i++) {
     var slip = String(vals[i][0]);
@@ -678,9 +694,24 @@ function smartPush(entries) {
     sheetMap[slip] = { row: i + 1, json: json };
   }
 
+  // Remove any deleted slips that somehow crept back into the sheet
+  // Walk backwards so row deletion doesn't shift indexes
+  for (var i = vals.length - 1; i >= 1; i--) {
+    var slipNum = String(vals[i][0]);
+    if (dset[slipNum]) {
+      sh.deleteRow(i + 1);
+      delete sheetMap[slipNum];
+    }
+  }
+
   var added = 0, updated = 0;
   entries.forEach(function(e) {
     var key = String(e.slip);
+    // Skip deleted slips — never write them back
+    if (dset[key]) return;
+    // Skip corrupt/empty entries
+    if (!e.slip || !e.cname) return;
+
     var newJson = JSON.stringify(e);
     if (!sheetMap[key]) {
       // New slip — append
@@ -825,12 +856,17 @@ function loadLog(){
   try{
     var s=localStorage.getItem('spyon_log2');
     var log=s?JSON.parse(s):[];
-    // Always strip deleted slips so they never reappear anywhere
+    // Strip deleted slips
     var deleted=loadDeletedSlips();
-    if(!deleted.length) return log;
     var dset={};
     deleted.forEach(function(n){dset[String(n)]=1;});
-    return log.filter(function(e){return !dset[String(e.slip)];});
+    // Also strip corrupt/empty entries — must have a slip number and customer name
+    return log.filter(function(e){
+      if(!e||typeof e!=='object') return false;
+      if(!e.slip||!e.cname||typeof e.cname!=='string'||!e.cname.trim()) return false;
+      if(dset[String(e.slip)]) return false;
+      return true;
+    });
   }catch(e){return [];}
 }
 function saveLog(a)    { localStorage.setItem('spyon_log2',JSON.stringify(a)); }
@@ -1105,6 +1141,22 @@ function initData(){
     localStorage.removeItem('sp_fresh_v8');
     localStorage.setItem('sp_fresh_v9','1');
   }
+  // Clean corrupt/empty entries from raw storage immediately on every load
+  try{
+    var raw=localStorage.getItem('spyon_log2');
+    if(raw){
+      var arr=JSON.parse(raw);
+      var deleted=loadDeletedSlips();
+      var dset={};deleted.forEach(function(n){dset[String(n)]=1;});
+      var clean=arr.filter(function(e){
+        if(!e||typeof e!=='object') return false;
+        if(!e.slip||!e.cname||typeof e.cname!=='string'||!e.cname.trim()) return false;
+        if(dset[String(e.slip)]) return false;
+        return true;
+      });
+      if(clean.length!==arr.length) localStorage.setItem('spyon_log2',JSON.stringify(clean));
+    }
+  }catch(ex){}
 }
 
 function _today(){
@@ -1400,7 +1452,8 @@ function renderStats(){
 // LOG
 // ═══════════════════════════════════════════════════════════════════
 function allSerialsDone(e){
-  return (e.items||[]).every(function(it){
+  if(!e.items||!e.items.length) return false; // no items = not done
+  return e.items.every(function(it){
     return (it.serials||[]).every(function(s){return (s.status||'PENDING')==='GIVEN';});
   });
 }
