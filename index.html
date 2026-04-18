@@ -1145,7 +1145,7 @@ function initData(){
     localStorage.removeItem('sp_fresh_v8');
     localStorage.setItem('sp_fresh_v9','1');
   }
-  // Clean corrupt/empty entries from raw storage immediately on every load
+  // Clean corrupt/empty entries from raw log storage on every load
   try{
     var raw=localStorage.getItem('spyon_log2');
     if(raw){
@@ -1160,6 +1160,12 @@ function initData(){
       });
       if(clean.length!==arr.length) localStorage.setItem('spyon_log2',JSON.stringify(clean));
     }
+  }catch(ex){}
+  // Clean corrupt values from the deleted list (e.g. "undefined", non-numeric)
+  try{
+    var del=loadDeletedSlips();
+    var cleanDel=del.filter(function(s){ return s && s!=='undefined' && !isNaN(parseInt(s)); });
+    if(cleanDel.length!==del.length) saveDeletedSlips(cleanDel);
   }catch(ex){}
 }
 
@@ -1203,7 +1209,9 @@ function initForm(){
 
 async function updateSlipDisp(){
   var log=loadLog();
-  var local=log.length ? Math.max.apply(null,log.map(function(e){return e.slip;})) + 1 : 1;
+  var allUsed=log.map(function(e){return parseInt(e.slip)||0;});
+  loadDeletedSlips().forEach(function(s){allUsed.push(parseInt(s)||0);});
+  var local=allUsed.length?Math.max.apply(null,allUsed)+1:1;
   document.getElementById('slip-disp').textContent=local;
 }
 
@@ -1418,22 +1426,35 @@ async function submitEntry(){
   log.push(entry);
   saveLog(log);
   autoSaveContact(cname,phone);
-  toast('Slip #'+slip+' saved');
+
+  // Update UI immediately — before any blocking calls
   renderStats();
   renderLog();
+  initForm();
 
-  // Push to cloud
-  await pushSingleEntry(entry);
+  // Show toast with print option — non-blocking
+  _toastWithPrint('Slip #'+slip+' saved ✓', entry);
 
-  // WA if phone
+  // Push to cloud in background
+  pushSingleEntry(entry);
+
+  // WA if phone — delayed so it doesn't interrupt
   if(phone){
     var msg=buildWhatsAppMsg(entry);
     var ph=phone.replace(/\D/g,'').slice(-10);
-    if(ph.length===10) setTimeout(function(){window.open('https://wa.me/91'+ph+'?text='+encodeURIComponent(msg),'_blank');},800);
+    if(ph.length===10) setTimeout(function(){window.open('https://wa.me/91'+ph+'?text='+encodeURIComponent(msg),'_blank');},600);
   }
+}
 
-  setTimeout(function(){printSlip(entry);},300);
-  setTimeout(function(){initForm();},400);
+// Toast with a Print button — lets user choose to print without blocking the UI
+function _toastWithPrint(msg, entry){
+  var t=document.getElementById('toast');
+  var tmsg=document.getElementById('tmsg');
+  tmsg.innerHTML=msg+' &nbsp;<button onclick="printSlip(window._lastEntry)" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700;margin-left:4px">🖨 Print</button>';
+  window._lastEntry=entry;
+  t.style.background='var(--navy)';
+  t.classList.add('on');
+  setTimeout(function(){t.classList.remove('on');},5000);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1625,7 +1646,10 @@ function deleteSlip(slip){
     saveLog(log2);
     // Record deletion so every other device knows to strip it on next pull
     var deleted=loadDeletedSlips();
-    if(deleted.indexOf(String(slip))===-1){ deleted.push(String(slip)); saveDeletedSlips(deleted); }
+    var slipKey=String(slip);
+    if(slipKey && slipKey!=='undefined' && deleted.indexOf(slipKey)===-1){
+      deleted.push(slipKey); saveDeletedSlips(deleted);
+    }
     // Delete from Sheets row and push updated deleted list
     deleteCloudEntry(slip);
     if(loadGASUrl()) gasPost('pushDeleted',{slips:loadDeletedSlips()});
