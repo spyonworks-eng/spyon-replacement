@@ -533,15 +533,17 @@ td{padding:7px 10px;vertical-align:top}
 var GAS_CODE = `const SHEET_NAME     = 'REPLACEMENT LOG';
 const CONTACTS_SHEET = 'CONTACTS';
 const ITEMS_SHEET    = 'ITEMS';
+const DELETED_SHEET  = 'DELETED_SLIPS';
 
 // ── ROUTING ──────────────────────────────────────────────────────────
 function doGet(e) {
   var action = e.parameter.action;
-  if (action === 'ping')         return ok({status:'connected'});
-  if (action === 'pull')         return ok(getData());
-  if (action === 'nextSlip')     return ok({next: getNextSlipNum()});
-  if (action === 'pullContacts') return ok(getContacts());
-  if (action === 'pullItems')    return ok(getItems());
+  if (action === 'ping')          return ok({status:'connected'});
+  if (action === 'pull')          return ok(getData());
+  if (action === 'nextSlip')      return ok({next: getNextSlipNum()});
+  if (action === 'pullContacts')  return ok(getContacts());
+  if (action === 'pullItems')     return ok(getItems());
+  if (action === 'pullDeleted')   return ok(getDeleted());
   return ok({error:'unknown'});
 }
 
@@ -551,9 +553,10 @@ function doPost(e) {
   if (d.action === 'smartPush')     { return ok(smartPush(d.entries)); }
   if (d.action === 'add')           { appendEntry(d.entry); return ok({status:'added', slip:d.entry.slip}); }
   if (d.action === 'update')        { updateEntry(d.entry); return ok({status:'updated'}); }
-  if (d.action === 'delete')        { deleteEntry(d.slip);  return ok({status:'deleted'}); }
+  if (d.action === 'delete')        { deleteEntry(d.slip); addDeleted(d.slip); return ok({status:'deleted'}); }
   if (d.action === 'pushContacts')  { writeContacts(d.contacts); return ok({status:'ok', count:d.contacts.length}); }
   if (d.action === 'pushItems')     { writeItems(d.items); return ok({status:'ok', count:d.items.length}); }
+  if (d.action === 'pushDeleted')   { writeDeleted(d.slips); return ok({status:'ok'}); }
   return ok({error:'unknown'});
 }
 
@@ -765,6 +768,49 @@ function writeContacts(contacts) {
   if (!contacts.length) return;
   var rows = contacts.map(function(c){ return [c.name, c.phone||'']; });
   sh.getRange(2, 1, rows.length, 2).setValues(rows);
+}
+
+// ── DELETED SLIPS SHEET ───────────────────────────────────────────────
+function getDeletedSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(DELETED_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(DELETED_SHEET);
+    sh.appendRow(['SLIP#']);
+    sh.getRange(1,1,1,1).setBackground('#bf3325').setFontColor('#fff').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function getDeleted() {
+  var sh = getDeletedSheet();
+  var rows = sh.getDataRange().getValues();
+  if (rows.length < 2) return [];
+  return rows.slice(1)
+    .map(function(r){ return String(r[0]).trim(); })
+    .filter(function(v){ return v.length > 0; });
+}
+
+// Add a single slip number to the deleted sheet (called on each delete action)
+function addDeleted(slip) {
+  var sh = getDeletedSheet();
+  var existing = getDeleted();
+  var key = String(slip);
+  if (existing.indexOf(key) === -1) {
+    sh.appendRow([key]);
+  }
+}
+
+// Full overwrite of deleted list (called from pushDeleted)
+function writeDeleted(slips) {
+  var sh = getDeletedSheet();
+  sh.clearContents();
+  sh.appendRow(['SLIP#']);
+  sh.getRange(1,1,1,1).setBackground('#bf3325').setFontColor('#fff').setFontWeight('bold');
+  if (!slips.length) return;
+  var rows = slips.map(function(s){ return [String(s)]; });
+  sh.getRange(2, 1, rows.length, 1).setValues(rows);
 }`;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -775,8 +821,21 @@ var DEFAULT_ITEMS = ["4X4 BOX","4.5x4.5 BOX","5X5 BOX","ADP","ADP HANDSET","ADP 
 // ═══════════════════════════════════════════════════════════════════
 // STORAGE
 // ═══════════════════════════════════════════════════════════════════
-function loadLog()     { try{var s=localStorage.getItem('spyon_log2');return s?JSON.parse(s):[];}catch(e){return [];} }
+function loadLog(){
+  try{
+    var s=localStorage.getItem('spyon_log2');
+    var log=s?JSON.parse(s):[];
+    // Always strip deleted slips so they never reappear anywhere
+    var deleted=loadDeletedSlips();
+    if(!deleted.length) return log;
+    var dset={};
+    deleted.forEach(function(n){dset[String(n)]=1;});
+    return log.filter(function(e){return !dset[String(e.slip)];});
+  }catch(e){return [];}
+}
 function saveLog(a)    { localStorage.setItem('spyon_log2',JSON.stringify(a)); }
+function loadDeletedSlips(){ try{var s=localStorage.getItem('spyon_deleted');return s?JSON.parse(s):[];}catch(e){return [];} }
+function saveDeletedSlips(a){ localStorage.setItem('spyon_deleted',JSON.stringify(a)); }
 function loadItems(){
   try{
     var s=localStorage.getItem('spyon_items');
@@ -878,7 +937,7 @@ async function testConnection(){
   }
 }
 
-// ── PUSH ALL (smart diff — only new/changed slips + contacts + items) ──
+// ── PUSH ALL (smart diff — only new/changed slips + contacts + items + deletions) ──
 async function pushAll(){
   if(!loadGASUrl()){toast('Set up Sheets URL first in Sync tab',1);return;}
   setSyncDot('busy'); setSyncMsg('Pushing changes…');
@@ -888,10 +947,13 @@ async function pushAll(){
   var d=await gasPost('smartPush',{entries:log});
   if(d&&d.status==='ok'){
     var msg='✓ Slips: +'+d.added+' new, '+d.updated+' updated, '+d.skipped+' unchanged';
-    setSyncMsg(msg+' · pushing contacts & items…');
-
-    // Push contacts and items in parallel
-    await Promise.all([syncContactsToCloud(), syncItemsToCloud()]);
+    setSyncMsg(msg+' · pushing contacts, items & deletions…');
+    // Push contacts, items, and deleted list in parallel
+    await Promise.all([
+      syncContactsToCloud(),
+      syncItemsToCloud(),
+      gasPost('pushDeleted',{slips:loadDeletedSlips()})
+    ]);
     setSyncDot('ok');
     setSyncMsg('✓ All pushed at '+_now()+' — '+d.added+' new slips, '+d.updated+' updated');
     toast('Pushed: '+d.added+' new, '+d.updated+' updated');
@@ -901,29 +963,37 @@ async function pushAll(){
   }
 }
 
-// ── PULL ALL (slips + contacts + items) ───────────────────────────────
 async function pullAll(silent){
   if(!loadGASUrl()){if(!silent)toast('Set up Sheets URL first in Sync tab',1);return;}
   if(!silent){setSyncDot('busy'); setSyncMsg('Pulling everything from Sheets…');}
 
-  // Pull slips, contacts, items in parallel
+  // Pull slips, contacts, items, and deleted list — all in parallel
   var results=await Promise.all([
     gasGet('pull'),
     gasGet('pullContacts'),
-    gasGet('pullItems')
+    gasGet('pullItems'),
+    gasGet('pullDeleted')
   ]);
-  var cloudLog=results[0], cloudContacts=results[1], cloudItems=results[2];
+  var cloudLog=results[0], cloudContacts=results[1], cloudItems=results[2], cloudDeleted=results[3];
 
-  // ── Merge slips ──
-  var slipCount=0;
-  if(Array.isArray(cloudLog)&&cloudLog.length>0){
+  // ── STEP 1: Merge deleted list FIRST — before touching the log ──
+  // Union of local + cloud deleted, saved immediately so mergeLogs picks it up
+  var localDeleted=loadDeletedSlips();
+  var dset={};
+  localDeleted.forEach(function(s){dset[String(s)]=1;});
+  if(Array.isArray(cloudDeleted)){
+    cloudDeleted.forEach(function(s){if(s)dset[String(s)]=1;});
+  }
+  saveDeletedSlips(Object.keys(dset));
+
+  // ── STEP 2: Merge slips — strip deleted entries from both sides ──
+  if(Array.isArray(cloudLog)){
     var merged=mergeLogs(loadLog(), cloudLog);
     saveLog(merged);
-    slipCount=merged.length;
     renderStats(); renderLog();
   }
 
-  // ── Merge contacts ──
+  // ── STEP 3: Merge contacts ──
   if(Array.isArray(cloudContacts)&&cloudContacts.length){
     var local=JSON.parse(localStorage.getItem('sp_contacts')||'[]');
     var cmap={};
@@ -937,7 +1007,7 @@ async function pullAll(silent){
     renderContacts();
   }
 
-  // ── Merge items ──
+  // ── STEP 4: Merge items ──
   if(Array.isArray(cloudItems)&&cloudItems.length){
     var iset={};
     loadItems().forEach(function(n){if(n)iset[n.toUpperCase()]=1;});
@@ -960,9 +1030,12 @@ async function pullAll(silent){
 async function syncFromCloud(){ await pullAll(false); }
 
 function mergeLogs(local, cloud){
+  // loadLog() already strips deleted from local, but also strip from cloud entries
+  var dset={};
+  loadDeletedSlips().forEach(function(s){dset[String(s)]=1;});
   var map={};
-  local.forEach(function(e){ map[e.slip]=e; });
-  cloud.forEach(function(e){ map[e.slip]=e; });
+  local.forEach(function(e){ if(!dset[String(e.slip)]) map[e.slip]=e; });
+  (cloud||[]).forEach(function(e){ if(!dset[String(e.slip)]) map[e.slip]=e; });
   return Object.values(map).sort(function(a,b){return a.slip-b.slip;});
 }
 
@@ -1485,9 +1558,15 @@ function deleteSlip(slip){
   document.getElementById('del-slip-label').textContent=label;
   document.getElementById('del-confirm-btn').onclick=function(){
     document.getElementById('del-modal').classList.remove('on');
+    // Remove from local log
     var log2=loadLog().filter(function(x){return x.slip!==slip;});
     saveLog(log2);
+    // Record deletion so every other device knows to strip it on next pull
+    var deleted=loadDeletedSlips();
+    if(deleted.indexOf(String(slip))===-1){ deleted.push(String(slip)); saveDeletedSlips(deleted); }
+    // Delete from Sheets row and push updated deleted list
     deleteCloudEntry(slip);
+    if(loadGASUrl()) gasPost('pushDeleted',{slips:loadDeletedSlips()});
     renderLog();
     toast('Slip #'+slip+' deleted');
   };
@@ -2071,7 +2150,7 @@ function showBackupInfo(){
 }
 
 function downloadBackup(){
-  var backup={version:3,exportedAt:new Date().toISOString(),log:loadLog(),items:loadItems(),contacts:loadContacts()};
+  var backup={version:4,exportedAt:new Date().toISOString(),log:loadLog(),items:loadItems(),contacts:loadContacts(),deleted:loadDeletedSlips()};
   var a=document.createElement('a');
   a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(backup,null,2));
   var d=new Date();
@@ -2090,6 +2169,7 @@ function restoreBackup(inp){
       localStorage.setItem('spyon_log2',JSON.stringify(b.log));
       if(b.items&&Array.isArray(b.items))localStorage.setItem('spyon_items',JSON.stringify(b.items));
       if(b.contacts&&Array.isArray(b.contacts))localStorage.setItem('sp_contacts',JSON.stringify(b.contacts));
+      if(b.deleted&&Array.isArray(b.deleted))localStorage.setItem('spyon_deleted',JSON.stringify(b.deleted));
       localStorage.setItem('sp_fresh_v9','1');
       toast('Restored '+b.log.length+' slips!');
       setTimeout(function(){location.reload();},1200);
