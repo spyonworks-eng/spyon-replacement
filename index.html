@@ -582,9 +582,13 @@ function getSheet() {
 function getNextSlipNum() {
   var sh = getSheet();
   var rows = sh.getDataRange().getValues();
-  if (rows.length < 2) return 1;
-  var slips = rows.slice(1).map(function(r){ return parseInt(r[0])||0; }).filter(function(n){return n>0;});
-  return slips.length ? Math.max.apply(null,slips)+1 : 1;
+  var slips = rows.length > 1
+    ? rows.slice(1).map(function(r){ return parseInt(r[0])||0; }).filter(function(n){return n>0;})
+    : [];
+  // Also consider deleted slip numbers so we never reuse one
+  var deleted = getDeleted();
+  deleted.forEach(function(s){ var n=parseInt(s)||0; if(n>0) slips.push(n); });
+  return slips.length ? Math.max.apply(null, slips) + 1 : 1;
 }
 
 function getData() {
@@ -1399,10 +1403,13 @@ async function submitEntry(){
   var items=collectItems();
   if(!items.length){toast('Add at least one item',1);return;}
 
-  // Get next slip number — try cloud first, fall back to local
+  // Get next slip number — must be higher than any used OR deleted number
   var log=loadLog();
   var cloudNext=await getNextSlipFromCloud();
-  var localNext=log.length?Math.max.apply(null,log.map(function(e){return e.slip;}))+1:1;
+  // Include deleted slip numbers in the max calculation so we never reuse one
+  var allUsed=log.map(function(e){return parseInt(e.slip)||0;});
+  loadDeletedSlips().forEach(function(s){allUsed.push(parseInt(s)||0);});
+  var localNext=allUsed.length?Math.max.apply(null,allUsed)+1:1;
   var slip=cloudNext||localNext;
 
   var entry={slip:slip,date:date,cname:cname,phone:phone,remarks:remarks,staff:staff,
