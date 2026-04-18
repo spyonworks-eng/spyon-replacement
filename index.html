@@ -1360,6 +1360,8 @@ async function submitEntry(){
   saveLog(log);
   autoSaveContact(cname,phone);
   toast('Slip #'+slip+' saved');
+  renderStats();
+  renderLog();
 
   // Push to cloud
   await pushSingleEntry(entry);
