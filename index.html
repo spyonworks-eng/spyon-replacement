@@ -315,21 +315,17 @@ td{padding:7px 10px;vertical-align:top}
 <div id="p-report" class="panel">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <!-- Status filter -->
       <select class="fsel" id="rpt-filter" onchange="renderReport()">
         <option value="all">All Status</option>
         <option value="PENDING">Pending</option>
         <option value="RECEIVED">Received</option>
         <option value="GIVEN">Given</option>
       </select>
-      <!-- Customer typeable autocomplete -->
       <div style="position:relative">
         <input class="lsrch" id="rpt-cust-inp" placeholder="All Customers..." oninput="rptCustAC()" onfocus="rptCustAC()" onblur="hideRptCustAC(200)" onkeydown="rptCustKey(event)" autocomplete="off" style="min-width:160px;padding-left:10px">
         <div id="ac-rpt-cust" class="acl" style="min-width:200px"></div>
       </div>
-      <!-- General search -->
       <input class="lsrch" id="rpt-search" placeholder="Search item / serial / slip#..." oninput="renderReport()" style="min-width:150px">
-      <!-- Date filters -->
       <div style="display:flex;align-items:center;gap:4px;background:#f4f6fa;border:1.5px solid #d4dae8;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--muted)">
         <span>Date:</span>
         <input id="rpt-date-from" type="text" placeholder="From DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
@@ -337,7 +333,6 @@ td{padding:7px 10px;vertical-align:top}
         <input id="rpt-date-to" type="text" placeholder="To DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
         <button onclick="document.getElementById('rpt-date-from').value='';document.getElementById('rpt-date-to').value='';renderReport();" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px" title="Clear dates">✕</button>
       </div>
-      <!-- Date Given filter -->
       <div style="display:flex;align-items:center;gap:4px;background:#f4f6fa;border:1.5px solid #d4dae8;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--muted)">
         <span>Given:</span>
         <input id="rpt-dgiven-from" type="text" placeholder="From DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
@@ -585,7 +580,6 @@ function getNextSlipNum() {
   var slips = rows.length > 1
     ? rows.slice(1).map(function(r){ return parseInt(r[0])||0; }).filter(function(n){return n>0;})
     : [];
-  // Also consider deleted slip numbers so we never reuse one
   var deleted = getDeleted();
   deleted.forEach(function(s){ var n=parseInt(s)||0; if(n>0) slips.push(n); });
   return slips.length ? Math.max.apply(null, slips) + 1 : 1;
@@ -595,7 +589,6 @@ function getData() {
   var sh = getSheet();
   var rows = sh.getDataRange().getValues();
   if (rows.length < 2) return [];
-  // Load deleted slip numbers so we never return them to any device
   var deletedNums = getDeleted();
   var dset = {};
   deletedNums.forEach(function(s){ dset[String(s)] = 1; });
@@ -607,7 +600,6 @@ function getData() {
       status:r[7]||'PENDING', dateGiven:r[8]||'', remarks:r[9]||''
     };
   });
-  // Strip deleted, corrupt, and empty entries
   return entries.filter(function(e){
     if(!e || !e.slip || !e.cname) return false;
     if(dset[String(e.slip)]) return false;
@@ -679,27 +671,18 @@ function _colorRow(sh, r, status) {
   sh.getRange(r,1,1,11).setBackground(status==='GIVEN'?'#eaf7ef':'#fef9ec');
 }
 
-// Smart push — only write rows that are new or changed, never wipe the sheet
-// Also skips any slip in the deleted list and removes them from the sheet if found
 function smartPush(entries) {
   var sh = getSheet();
   var vals = sh.getDataRange().getValues();
-
-  // Load deleted list once — used to skip and clean
   var deletedNums = getDeleted();
   var dset = {};
   deletedNums.forEach(function(s){ dset[String(s)] = 1; });
-
-  // Build a map of what's currently in Sheets: slip# → {rowIndex, json}
   var sheetMap = {};
   for (var i = 1; i < vals.length; i++) {
     var slip = String(vals[i][0]);
     var json = vals[i][10] ? String(vals[i][10]) : '';
     sheetMap[slip] = { row: i + 1, json: json };
   }
-
-  // Remove any deleted slips that somehow crept back into the sheet
-  // Walk backwards so row deletion doesn't shift indexes
   for (var i = vals.length - 1; i >= 1; i--) {
     var slipNum = String(vals[i][0]);
     if (dset[slipNum]) {
@@ -707,22 +690,16 @@ function smartPush(entries) {
       delete sheetMap[slipNum];
     }
   }
-
   var added = 0, updated = 0;
   entries.forEach(function(e) {
     var key = String(e.slip);
-    // Skip deleted slips — never write them back
     if (dset[key]) return;
-    // Skip corrupt/empty entries
     if (!e.slip || !e.cname) return;
-
     var newJson = JSON.stringify(e);
     if (!sheetMap[key]) {
-      // New slip — append
       _appendRow(sh, e);
       added++;
     } else if (sheetMap[key].json !== newJson) {
-      // Changed slip — overwrite that row
       var items = (e.items||[]).map(function(it){return it.qty+'x '+it.name;}).join(' | ');
       var sns   = (e.items||[]).map(function(it){return (it.serials||[]).map(function(s){return s.sn||'';}).filter(Boolean).join(',');}).filter(Boolean).join(' | ');
       sh.getRange(sheetMap[key].row,1,1,11).setValues([[
@@ -732,9 +709,7 @@ function smartPush(entries) {
       _colorRow(sh, sheetMap[key].row, e.status);
       updated++;
     }
-    // If json matches exactly — skip, no write needed
   });
-
   _colorRows(sh);
   return {status:'ok', added:added, updated:updated, skipped:entries.length-added-updated};
 }
@@ -789,12 +764,10 @@ function writeItems(items) {
   sh.appendRow(['ITEM_NAME']);
   sh.getRange(1,1,1,1).setBackground('#0d1b35').setFontColor('#fff').setFontWeight('bold');
   if (!items.length) return;
-  // Batch write all at once — single API call, never times out
   var rows = items.map(function(name){ return [name]; });
   sh.getRange(2, 1, rows.length, 1).setValues(rows);
 }
 
-// Also fix writeContacts to use batch write
 function writeContacts(contacts) {
   var sh = getContactsSheet();
   sh.clearContents();
@@ -827,7 +800,6 @@ function getDeleted() {
     .filter(function(v){ return v.length > 0; });
 }
 
-// Add a single slip number to the deleted sheet (called on each delete action)
 function addDeleted(slip) {
   var sh = getDeletedSheet();
   var existing = getDeleted();
@@ -837,7 +809,6 @@ function addDeleted(slip) {
   }
 }
 
-// Full overwrite of deleted list (called from pushDeleted)
 function writeDeleted(slips) {
   var sh = getDeletedSheet();
   sh.clearContents();
@@ -860,11 +831,9 @@ function loadLog(){
   try{
     var s=localStorage.getItem('spyon_log2');
     var log=s?JSON.parse(s):[];
-    // Strip deleted slips
     var deleted=loadDeletedSlips();
     var dset={};
     deleted.forEach(function(n){dset[String(n)]=1;});
-    // Also strip corrupt/empty entries — must have a slip number and customer name
     return log.filter(function(e){
       if(!e||typeof e!=='object') return false;
       if(!e.slip||!e.cname||typeof e.cname!=='string'||!e.cname.trim()) return false;
@@ -880,13 +849,11 @@ function loadItems(){
   try{
     var s=localStorage.getItem('spyon_items');
     var saved=s?JSON.parse(s):DEFAULT_ITEMS.slice().sort();
-    // Always merge with item names extracted from the log so custom items are never lost
     return _mergeWithLogItems(saved);
   }catch(e){return _mergeWithLogItems(DEFAULT_ITEMS.slice().sort());}
 }
 function saveItems(a){ localStorage.setItem('spyon_items',JSON.stringify(a)); }
 
-// Extract unique item names from the slip log and merge with saved list
 function _mergeWithLogItems(saved){
   var set={};
   saved.forEach(function(n){if(n)set[n.toUpperCase()]=1;});
@@ -906,20 +873,14 @@ function loadContacts(){
   try{
     var s=localStorage.getItem('sp_contacts');
     var saved=s?JSON.parse(s):[];
-    // Always merge with contacts extracted from the log so no customer is ever missing
     return _mergeWithLogContacts(saved);
   }catch(e){return _mergeWithLogContacts([]);}
 }
 function saveContacts(a){ localStorage.setItem('sp_contacts',JSON.stringify(a)); }
 
-// Build a contact list from the slip log and merge with manually saved contacts
-// Log entries always win for phone number if the saved contact has none
 function _mergeWithLogContacts(saved){
   var map={};
-  // Start with manually saved contacts
   saved.forEach(function(c){if(c.name)map[c.name.toLowerCase()]={name:c.name,phone:c.phone||''};});
-  // Layer in contacts derived from the log — adds any customer not already present,
-  // and fills in missing phone numbers
   try{
     var log=JSON.parse(localStorage.getItem('spyon_log2')||'[]');
     log.forEach(function(e){
@@ -977,18 +938,14 @@ async function testConnection(){
   }
 }
 
-// ── PUSH ALL (smart diff — only new/changed slips + contacts + items + deletions) ──
 async function pushAll(){
   if(!loadGASUrl()){toast('Set up Sheets URL first in Sync tab',1);return;}
   setSyncDot('busy'); setSyncMsg('Pushing changes…');
   var log=loadLog();
-
-  // Smart push slips — only sends new or changed rows
   var d=await gasPost('smartPush',{entries:log});
   if(d&&d.status==='ok'){
     var msg='✓ Slips: +'+d.added+' new, '+d.updated+' updated, '+d.skipped+' unchanged';
     setSyncMsg(msg+' · pushing contacts, items & deletions…');
-    // Push contacts, items, and deleted list in parallel
     await Promise.all([
       syncContactsToCloud(),
       syncItemsToCloud(),
@@ -1007,7 +964,6 @@ async function pullAll(silent){
   if(!loadGASUrl()){if(!silent)toast('Set up Sheets URL first in Sync tab',1);return;}
   if(!silent){setSyncDot('busy'); setSyncMsg('Pulling everything from Sheets…');}
 
-  // Pull slips, contacts, items, and deleted list — all in parallel
   var results=await Promise.all([
     gasGet('pull'),
     gasGet('pullContacts'),
@@ -1016,8 +972,6 @@ async function pullAll(silent){
   ]);
   var cloudLog=results[0], cloudContacts=results[1], cloudItems=results[2], cloudDeleted=results[3];
 
-  // ── STEP 1: Merge deleted list FIRST — before touching the log ──
-  // Union of local + cloud deleted, saved immediately so mergeLogs picks it up
   var localDeleted=loadDeletedSlips();
   var dset={};
   localDeleted.forEach(function(s){dset[String(s)]=1;});
@@ -1026,14 +980,12 @@ async function pullAll(silent){
   }
   saveDeletedSlips(Object.keys(dset));
 
-  // ── STEP 2: Merge slips — strip deleted entries from both sides ──
   if(Array.isArray(cloudLog)){
     var merged=mergeLogs(loadLog(), cloudLog);
     saveLog(merged);
     renderStats(); renderLog();
   }
 
-  // ── STEP 3: Merge contacts ──
   if(Array.isArray(cloudContacts)&&cloudContacts.length){
     var local=JSON.parse(localStorage.getItem('sp_contacts')||'[]');
     var cmap={};
@@ -1047,7 +999,6 @@ async function pullAll(silent){
     renderContacts();
   }
 
-  // ── STEP 4: Merge items ──
   if(Array.isArray(cloudItems)&&cloudItems.length){
     var iset={};
     loadItems().forEach(function(n){if(n)iset[n.toUpperCase()]=1;});
@@ -1066,11 +1017,9 @@ async function pullAll(silent){
   }
 }
 
-// Keep old name working (used in Log tab refresh button)
 async function syncFromCloud(){ await pullAll(false); }
 
 function mergeLogs(local, cloud){
-  // loadLog() already strips deleted from local, but also strip from cloud entries
   var dset={};
   loadDeletedSlips().forEach(function(s){dset[String(s)]=1;});
   var map={};
@@ -1109,13 +1058,11 @@ async function deleteCloudEntry(slip){
   else setSyncDot('err');
 }
 
-// Push local contacts to Google Sheets CONTACTS tab
 async function syncContactsToCloud(){
   if(!loadGASUrl()) return;
   await gasPost('pushContacts',{contacts:loadContacts()});
 }
 
-// Push local items to Google Sheets ITEMS tab
 async function syncItemsToCloud(){
   if(!loadGASUrl()) return;
   await gasPost('pushItems',{items:loadItems()});
@@ -1136,7 +1083,6 @@ function copyGASCode(){
 // INIT
 // ═══════════════════════════════════════════════════════════════════
 function initData(){
-  // Clear old test data — bump key to reset
   if(!localStorage.getItem('sp_fresh_v9')){
     localStorage.removeItem('spyon_log2');
     localStorage.removeItem('sp_log');
@@ -1145,7 +1091,6 @@ function initData(){
     localStorage.removeItem('sp_fresh_v8');
     localStorage.setItem('sp_fresh_v9','1');
   }
-  // Clean corrupt/empty entries from raw log storage on every load
   try{
     var raw=localStorage.getItem('spyon_log2');
     if(raw){
@@ -1161,7 +1106,6 @@ function initData(){
       if(clean.length!==arr.length) localStorage.setItem('spyon_log2',JSON.stringify(clean));
     }
   }catch(ex){}
-  // Clean corrupt values from the deleted list (e.g. "undefined", non-numeric)
   try{
     var del=loadDeletedSlips();
     var cleanDel=del.filter(function(s){ return s && s!=='undefined' && !isNaN(parseInt(s)); });
@@ -1300,7 +1244,6 @@ function acKey(e,rid){
   else if(e.key==='Escape'){list.classList.remove('on');}
 }
 
-// Customer autocomplete (by name)
 function custAC(inp){
   var q=inp.value.trim().toLowerCase(); var contacts=loadContacts();
   var list=document.getElementById('ac-cust'); if(!list)return;
@@ -1332,7 +1275,6 @@ function custKey(e){
   else if(e.key==='Escape'){list.classList.remove('on');}
 }
 
-// Helper: position dropdown above or below input
 function positionAC(inp, list){
   var rect=inp.getBoundingClientRect();
   var spaceBelow=window.innerHeight-rect.bottom;
@@ -1344,7 +1286,6 @@ function positionAC(inp, list){
   }
 }
 
-// Phone autocomplete (by phone number → fetch name)
 function phoneAC(inp){
   var q=inp.value.trim(); var contacts=loadContacts();
   var list=document.getElementById('ac-phone'); if(!list)return;
@@ -1411,10 +1352,8 @@ async function submitEntry(){
   var items=collectItems();
   if(!items.length){toast('Add at least one item',1);return;}
 
-  // Get next slip number — must be higher than any used OR deleted number
   var log=loadLog();
   var cloudNext=await getNextSlipFromCloud();
-  // Include deleted slip numbers in the max calculation so we never reuse one
   var allUsed=log.map(function(e){return parseInt(e.slip)||0;});
   loadDeletedSlips().forEach(function(s){allUsed.push(parseInt(s)||0);});
   var localNext=allUsed.length?Math.max.apply(null,allUsed)+1:1;
@@ -1427,18 +1366,14 @@ async function submitEntry(){
   saveLog(log);
   autoSaveContact(cname,phone);
 
-  // Update UI immediately — before any blocking calls
   renderStats();
   renderLog();
   initForm();
 
-  // Show toast with print option — non-blocking
   _toastWithPrint('Slip #'+slip+' saved ✓', entry);
 
-  // Push to cloud in background
   pushSingleEntry(entry);
 
-  // WA if phone — delayed so it doesn't interrupt
   if(phone){
     var msg=buildWhatsAppMsg(entry);
     var ph=phone.replace(/\D/g,'').slice(-10);
@@ -1446,7 +1381,6 @@ async function submitEntry(){
   }
 }
 
-// Toast with a Print button — lets user choose to print without blocking the UI
 function _toastWithPrint(msg, entry){
   var t=document.getElementById('toast');
   var tmsg=document.getElementById('tmsg');
@@ -1477,10 +1411,10 @@ function renderStats(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LOG
+// LOG  ← THE KEY FIX IS HERE
 // ═══════════════════════════════════════════════════════════════════
 function allSerialsDone(e){
-  if(!e.items||!e.items.length) return false; // no items = not done
+  if(!e.items||!e.items.length) return false;
   return e.items.every(function(it){
     return (it.serials||[]).every(function(s){return (s.status||'PENDING')==='GIVEN';});
   });
@@ -1525,18 +1459,49 @@ function renderLog(){
     var slipBadge=done?'<span class="badge bg">ALL GIVEN</span>':'<span class="badge bp">PENDING</span>';
 
     var detailRows='';
+
+    // ── FIXED: when searching, only render the matching items/serials ──
     (e.items||[]).forEach(function(it,ii){
-      var pcs=(it.serials||[]).length||parseInt(it.qty)||1;
-      detailRows+=
+
+      // Determine which serials to show based on search query
+      var matchingSerials;
+      if(q){
+        var itemNameMatch = it.name.toLowerCase().indexOf(q) >= 0;
+        var allSerials = (it.serials && it.serials.length > 0)
+          ? it.serials
+          : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
+
+        if(itemNameMatch){
+          // Item name itself matches → show all its serials
+          matchingSerials = allSerials;
+        } else {
+          // Only show serials whose S/N matches
+          matchingSerials = allSerials.filter(function(s){
+            return (s.sn||'').toLowerCase().indexOf(q) >= 0;
+          });
+        }
+        // Nothing matched in this item — skip it entirely
+        if(!matchingSerials.length) return;
+      } else {
+        // No search active — show everything as before
+        matchingSerials = (it.serials && it.serials.length > 0)
+          ? it.serials
+          : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
+      }
+
+      var pcs = matchingSerials.length || parseInt(it.qty) || 1;
+      detailRows +=
         '<tr class="item-header-row">'
         +'<td colspan="5" style="padding:5px 10px 2px 18px;font-size:11.5px;font-weight:700;color:var(--navy2)">'
         +it.name+' <span style="font-size:10px;color:var(--muted);font-weight:400">'+pcs+' pcs</span>'
         +'</td></tr>';
 
-      var rows=(it.serials&&it.serials.length>0)?it.serials:[{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
-      rows.forEach(function(s,si){
+      matchingSerials.forEach(function(s,si){
         var st=s.status||'PENDING'; var dg=s.dateGiven||''; var rc=s.received||'';
-        var uid=e.slip+'_'+ii+'_'+si;
+        // Use the real index in e.items[ii].serials for save operations
+        var realSi = (it.serials||[]).indexOf(s);
+        if(realSi < 0) realSi = si; // fallback
+        var uid=e.slip+'_'+ii+'_'+realSi;
         detailRows+=
           '<tr class="serial-detail-row'+(st==='GIVEN'?' st-given':st==='RECEIVED'?' st-received':' st-pending')+'">'
           +'<td style="padding:5px 10px 5px 28px;font-size:11px">'
@@ -1544,21 +1509,21 @@ function renderLog(){
           +(s.remark?' <span class="irm">'+s.remark+'</span>':'')
           +'</td>'
           +'<td style="padding:5px 4px">'
-          +'<select class="item-stat-sel" onchange="saveSerialField('+e.slip+','+ii+','+si+',\'status\',this.value)">'
+          +'<select class="item-stat-sel" onchange="saveSerialField('+e.slip+','+ii+','+realSi+',\'status\',this.value)">'
           +'<option value="PENDING"'+(st==='PENDING'?' selected':'')+'>PENDING</option>'
           +'<option value="RECEIVED"'+(st==='RECEIVED'?' selected':'')+'>RECEIVED</option>'
           +'<option value="GIVEN"'+(st==='GIVEN'?' selected':'')+'>GIVEN</option>'
           +'</select></td>'
           +'<td style="padding:5px 4px"><div style="display:flex;gap:3px">'
           +'<input class="dgi" id="dg'+uid+'" value="'+dg+'" placeholder="DD.MM.YY"'
-          +' onkeydown="if(event.key===\'Enter\')saveSerialField('+e.slip+','+ii+','+si+',\'dateGiven\',this.value)">'
-          +'<button class="sdb" onclick="saveSerialField('+e.slip+','+ii+','+si+',\'dateGiven\',document.getElementById(\'dg'+uid+'\').value.trim())">✓</button>'
+          +' onkeydown="if(event.key===\'Enter\')saveSerialField('+e.slip+','+ii+','+realSi+',\'dateGiven\',this.value)">'
+          +'<button class="sdb" onclick="saveSerialField('+e.slip+','+ii+','+realSi+',\'dateGiven\',document.getElementById(\'dg'+uid+'\').value.trim())">✓</button>'
           +'</div></td>'
           +'<td style="padding:5px 4px"><div style="display:flex;gap:3px">'
           +'<input class="dgi" id="rc'+uid+'" value="'+rc+'" placeholder="Received?" style="width:115px"'
-          +' onkeydown="if(event.key===\'Enter\')saveSerialField('+e.slip+','+ii+','+si+',\'received\',this.value)">'
+          +' onkeydown="if(event.key===\'Enter\')saveSerialField('+e.slip+','+ii+','+realSi+',\'received\',this.value)">'
           +'<button class="sdb" style="background:#e8f0ff;color:var(--navy2);border-color:#b0c4f5"'
-          +' onclick="saveSerialField('+e.slip+','+ii+','+si+',\'received\',document.getElementById(\'rc'+uid+'\').value.trim())">✓</button>'
+          +' onclick="saveSerialField('+e.slip+','+ii+','+realSi+',\'received\',document.getElementById(\'rc'+uid+'\').value.trim())">✓</button>'
           +'</div></td>'
           +'<td></td></tr>';
       });
@@ -1616,11 +1581,8 @@ function saveSerialField(slip,ii,si,field,value){
     var sel=document.querySelector('[onchange*="'+slip+','+ii+','+si+'"]');
     if(sel)sel.value='GIVEN';
   }
-  // When "received" field is filled (item received back from company) mark orange
   if(field==='received'&&value&&s.status!=='GIVEN'){
     s.status='RECEIVED';
-    var selR=document.querySelector('[onchange*="'+slip+','+ii+','+si+'"]');
-    if(selR&&selR.querySelector) {/* keep select as is */}
   }
   var allDone=e.items.every(function(it2){return (it2.serials||[]).every(function(s2){return (s2.status||'PENDING')==='GIVEN';});});
   e.status=allDone?'GIVEN':'PENDING';
@@ -1641,16 +1603,13 @@ function deleteSlip(slip){
   document.getElementById('del-slip-label').textContent=label;
   document.getElementById('del-confirm-btn').onclick=function(){
     document.getElementById('del-modal').classList.remove('on');
-    // Remove from local log
     var log2=loadLog().filter(function(x){return x.slip!==slip;});
     saveLog(log2);
-    // Record deletion so every other device knows to strip it on next pull
     var deleted=loadDeletedSlips();
     var slipKey=String(slip);
     if(slipKey && slipKey!=='undefined' && deleted.indexOf(slipKey)===-1){
       deleted.push(slipKey); saveDeletedSlips(deleted);
     }
-    // Delete from Sheets row and push updated deleted list
     deleteCloudEntry(slip);
     if(loadGASUrl()) gasPost('pushDeleted',{slips:loadDeletedSlips()});
     renderLog();
@@ -1676,7 +1635,6 @@ function openEdit(slip){
   document.getElementById('edit-remarks').value =e.remarks||'';
   document.getElementById('edit-staff').value   =e.staff||'';
 
-  // Build editable items
   var list=document.getElementById('edit-items-list');
   list.innerHTML=(e.items||[]).map(function(it,ii){
     var snRows=(it.serials||[]).map(function(s,si){
@@ -1720,7 +1678,6 @@ function saveEdit(){
   e.remarks =document.getElementById('edit-remarks').value.trim();
   e.staff   =document.getElementById('edit-staff').value;
 
-  // Update items
   (e.items||[]).forEach(function(it,ii){
     var nameEl=document.getElementById('ename_'+ii);
     var qtyEl =document.getElementById('eqty_'+ii);
@@ -1845,10 +1802,9 @@ function delItem(name){
 // ═══════════════════════════════════════════════════════════════════
 // REPORT
 // ═══════════════════════════════════════════════════════════════════
-var _lastReportRows = []; // stores the exact filtered rows currently visible
-var _rptCustFilter = ''; // active customer filter value
+var _lastReportRows = [];
+var _rptCustFilter = '';
 
-// Parse DD.MM.YY or DD.MM.YYYY to comparable integer YYYYMMDD
 function _parseDate(s){
   if(!s)return null;
   var p=s.trim().split('.');
@@ -1880,31 +1836,22 @@ function renderReport(){
     });
   });
 
-  // Status filter
   if(fs!=='all') rows=rows.filter(function(r){return r.status===fs;});
-
-  // Customer filter (from typeable input)
   if(_rptCustFilter) rows=rows.filter(function(r){return r.cname===_rptCustFilter;});
-
-  // General search
   if(q) rows=rows.filter(function(r){
     return r.cname.toLowerCase().indexOf(q)>=0||String(r.slip).indexOf(q)>=0
       ||r.item.toLowerCase().indexOf(q)>=0||r.sn.toLowerCase().indexOf(q)>=0
       ||(r.phone||'').indexOf(q)>=0;
   });
-
-  // Date (slip date) range filter
   if(dateFrom||dateTo) rows=rows.filter(function(r){
     var d=_parseDate(r.date); if(!d)return true;
     if(dateFrom&&d<dateFrom)return false;
     if(dateTo&&d>dateTo)return false;
     return true;
   });
-
-  // Date Given range filter
   if(dgivenFrom||dgivenTo) rows=rows.filter(function(r){
     var d=_parseDate(r.dateGiven);
-    if(!d)return false; // exclude rows without a given date when filtering by given date
+    if(!d)return false;
     if(dgivenFrom&&d<dgivenFrom)return false;
     if(dgivenTo&&d>dgivenTo)return false;
     return true;
@@ -1949,7 +1896,6 @@ function renderReport(){
   }).join('');
 }
 
-// ── Report customer autocomplete ──
 function rptCustAC(){
   var inp=document.getElementById('rpt-cust-inp');
   var q=(inp.value||'').toLowerCase().trim();
@@ -1957,7 +1903,6 @@ function rptCustAC(){
   log.forEach(function(e){if(!seen[e.cname]){seen[e.cname]=1;custs.push(e.cname);}});
   custs.sort();
   var list=document.getElementById('ac-rpt-cust'); if(!list)return;
-  // If input is cleared, reset filter and re-render
   if(!inp.value.trim()){_rptCustFilter='';renderReport();}
   var m=q?custs.filter(function(c){return c.toLowerCase().indexOf(q)>=0;}):custs.slice(0,60);
   if(!m.length){list.classList.remove('on');return;}
@@ -1977,10 +1922,8 @@ function selRptCust(el){
 function hideRptCustAC(d){
   setTimeout(function(){
     var list=document.getElementById('ac-rpt-cust'); if(list)list.classList.remove('on');
-    // If user typed something that doesn't match exactly, treat as partial search in q field
     var inp=document.getElementById('rpt-cust-inp');
     if(inp&&inp.value.trim()&&!_rptCustFilter){
-      // user typed but didn't pick — treat typed value as customer filter attempt
       var typed=inp.value.trim().toLowerCase();
       var log=loadLog(); var found='';
       log.forEach(function(e){if(e.cname.toLowerCase()===typed)found=e.cname;});
@@ -1998,7 +1941,7 @@ function rptCustKey(e){
   else if(e.key==='ArrowUp'){e.preventDefault();if(sel)sel.classList.remove('ksel');var prv=items[idx-1]||items[items.length-1];if(prv){prv.classList.add('ksel');prv.scrollIntoView({block:'nearest'});}}
   else if(e.key==='Enter'){e.preventDefault();var ks=list.querySelector('.aci.ksel');if(ks)selRptCust(ks);list.classList.remove('on');}
   else if(e.key==='Escape'){list.classList.remove('on');}
-  else if(e.key==='Backspace'||e.key==='Delete'){_rptCustFilter='';} // clear exact filter when editing
+  else if(e.key==='Backspace'||e.key==='Delete'){_rptCustFilter='';}
 }
 
 function exportReportCSV(){
@@ -2156,7 +2099,6 @@ function autoSaveContact(name,phone){
   var ex=c.find(function(x){return x.name.toLowerCase()===name.toLowerCase();});
   if(!ex){c.push({name:name,phone:ph});c.sort(function(a,b){return a.name.localeCompare(b.name);});saveContacts(c);toast('Contact saved: '+name);}
   else if(ph&&!ex.phone){ex.phone=ph;saveContacts(c);}
-  // Quietly push updated contacts to cloud in background
   syncContactsToCloud();
 }
 
@@ -2282,9 +2224,8 @@ function toast(msg,warn){
 window.onload=function(){
   initData();
   initForm();
-  // Auto-pull on open and every 60 seconds — covers slips, contacts and items
   if(loadGASUrl()){
-    pullAll(true); // silent on startup
+    pullAll(true);
     setInterval(function(){ if(loadGASUrl()) pullAll(true); }, 60000);
   }
 };
