@@ -180,6 +180,14 @@ td{padding:7px 10px;vertical-align:top}
 .modal-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 /* SYNC STATUS BAR */
 .sync-status-bar{background:var(--navy2);color:#fff;text-align:center;font-size:11px;padding:4px;font-weight:600;letter-spacing:.3px}
+/* WA AUTO NOTIFY TOGGLE */
+.wa-toggle{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:6px;
+  border:1.5px solid #25d366;background:#e8fdf0;color:#1a7a42;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;white-space:nowrap;
+  transition:all .15s;user-select:none}
+.wa-toggle.off{border-color:#d4dae8;background:#f4f6fa;color:var(--muted)}
+.wa-toggle .wdot{width:8px;height:8px;border-radius:50%;background:#25d366;flex-shrink:0;transition:background .15s}
+.wa-toggle.off .wdot{background:#ccc}
 /* PRINT */
 #rct{display:none;font-family:'Courier New',Courier,monospace;color:#000;background:#fff;width:72mm;padding:2mm;line-height:1.5}
 @media print{
@@ -280,6 +288,9 @@ td{padding:7px 10px;vertical-align:top}
     <select class="fsel" id="fcust" onchange="renderLog()"><option value="">All Customers</option></select>
     <button class="ebtn" onclick="syncFromCloud()" title="Refresh from Google Sheets">↻ Refresh</button>
     <button class="ebtn" onclick="exportCSV()">↓ CSV</button>
+    <button class="wa-toggle" id="wa-toggle-btn" onclick="toggleWANotify()" title="Auto-send WhatsApp when status changes to RECEIVED or GIVEN">
+      <span class="wdot"></span><span id="wa-toggle-lbl">WA Notify: ON</span>
+    </button>
   </div>
   <div class="tbwrap">
     <table>
@@ -530,7 +541,6 @@ const CONTACTS_SHEET = 'CONTACTS';
 const ITEMS_SHEET    = 'ITEMS';
 const DELETED_SHEET  = 'DELETED_SLIPS';
 
-// ── ROUTING ──────────────────────────────────────────────────────────
 function doGet(e) {
   var action = e.parameter.action;
   if (action === 'ping')          return ok({status:'connected'});
@@ -560,7 +570,6 @@ function ok(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── LOG SHEET ─────────────────────────────────────────────────────────
 function getSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
@@ -714,7 +723,6 @@ function smartPush(entries) {
   return {status:'ok', added:added, updated:updated, skipped:entries.length-added-updated};
 }
 
-// ── CONTACTS SHEET ────────────────────────────────────────────────────
 function getContactsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(CONTACTS_SHEET);
@@ -736,7 +744,6 @@ function getContacts() {
     .map(function(r){ return {name:String(r[0]).trim(), phone:String(r[1]||'').trim()}; });
 }
 
-// ── ITEMS SHEET ───────────────────────────────────────────────────────
 function getItemsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(ITEMS_SHEET);
@@ -778,7 +785,6 @@ function writeContacts(contacts) {
   sh.getRange(2, 1, rows.length, 2).setValues(rows);
 }
 
-// ── DELETED SLIPS SHEET ───────────────────────────────────────────────
 function getDeletedSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(DELETED_SHEET);
@@ -894,6 +900,71 @@ function _mergeWithLogContacts(saved){
     });
   }catch(ex){}
   return Object.values(map).sort(function(a,b){return a.name.localeCompare(b.name);});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WA AUTO-NOTIFY TOGGLE
+// ═══════════════════════════════════════════════════════════════════
+function loadWANotify(){ return localStorage.getItem('spyon_wa_notify')!=='off'; }
+function saveWANotify(v){ localStorage.setItem('spyon_wa_notify',v?'on':'off'); }
+
+function toggleWANotify(){
+  var cur=loadWANotify();
+  saveWANotify(!cur);
+  renderWAToggle();
+  toast('Auto WA Notify '+((!cur)?'ON':'OFF'));
+}
+
+function renderWAToggle(){
+  var btn=document.getElementById('wa-toggle-btn');
+  var lbl=document.getElementById('wa-toggle-lbl');
+  if(!btn||!lbl) return;
+  var on=loadWANotify();
+  btn.className='wa-toggle'+(on?'':' off');
+  lbl.textContent='WA Notify: '+(on?'ON':'OFF');
+}
+
+// Build the WhatsApp message depending on status
+function buildStatusMsg(entry, itemName, sn, status, dateGiven){
+  var name=entry.cname||'Customer';
+  if(status==='RECEIVED'){
+    var msg='Dear *'+name+'*,\n\n';
+    msg+='Your *'+itemName+'*';
+    if(sn) msg+=' (S/N: '+sn+')';
+    msg+=' is ready. Please come and pick it up at your convenience.\n\n';
+    msg+='— SpyOn';
+    return msg;
+  }
+  if(status==='GIVEN'){
+    var d=dateGiven||_today();
+    var msg='Dear *'+name+'*,\n\n';
+    msg+='Your *'+itemName+'*';
+    if(sn) msg+=' (S/N: '+sn+')';
+    msg+=' has been given to you on *'+d+'*.\n\n';
+    msg+='— SpyOn';
+    return msg;
+  }
+  return null;
+}
+
+// Fire WhatsApp for a status change
+function fireStatusWA(slip, itemName, sn, status, dateGiven){
+  if(!loadWANotify()) return;
+  var log=loadLog();
+  var entry=log.find(function(x){return x.slip===slip;});
+  if(!entry) return;
+  var ph=(entry.phone||'').replace(/\D/g,'');
+  if(ph.length===10) ph='91'+ph;
+  else if(ph.length===11&&ph[0]==='0') ph='91'+ph.slice(1);
+  if(!ph||ph.length<12){
+    toast('No phone on this slip — WA skipped',1);
+    return;
+  }
+  var msg=buildStatusMsg(entry, itemName, sn, status, dateGiven);
+  if(!msg) return;
+  setTimeout(function(){
+    window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
+  },400);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1411,7 +1482,7 @@ function renderStats(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LOG  ← THE KEY FIX IS HERE
+// LOG
 // ═══════════════════════════════════════════════════════════════════
 function allSerialsDone(e){
   if(!e.items||!e.items.length) return false;
@@ -1426,7 +1497,6 @@ function renderLog(){
   var fs=document.getElementById('fstatus').value;
   var fc=document.getElementById('fcust').value;
 
-  // Customer dropdown
   var custs=[]; var seen={};
   log.forEach(function(e){if(!seen[e.cname]){seen[e.cname]=1;custs.push(e.cname);}});
   custs.sort();
@@ -1460,10 +1530,7 @@ function renderLog(){
 
     var detailRows='';
 
-    // ── FIXED: when searching, only render the matching items/serials ──
     (e.items||[]).forEach(function(it,ii){
-
-      // Determine which serials to show based on search query
       var matchingSerials;
       if(q){
         var itemNameMatch = it.name.toLowerCase().indexOf(q) >= 0;
@@ -1472,18 +1539,14 @@ function renderLog(){
           : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
 
         if(itemNameMatch){
-          // Item name itself matches → show all its serials
           matchingSerials = allSerials;
         } else {
-          // Only show serials whose S/N matches
           matchingSerials = allSerials.filter(function(s){
             return (s.sn||'').toLowerCase().indexOf(q) >= 0;
           });
         }
-        // Nothing matched in this item — skip it entirely
         if(!matchingSerials.length) return;
       } else {
-        // No search active — show everything as before
         matchingSerials = (it.serials && it.serials.length > 0)
           ? it.serials
           : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
@@ -1498,9 +1561,8 @@ function renderLog(){
 
       matchingSerials.forEach(function(s,si){
         var st=s.status||'PENDING'; var dg=s.dateGiven||''; var rc=s.received||'';
-        // Use the real index in e.items[ii].serials for save operations
         var realSi = (it.serials||[]).indexOf(s);
-        if(realSi < 0) realSi = si; // fallback
+        if(realSi < 0) realSi = si;
         var uid=e.slip+'_'+ii+'_'+realSi;
         detailRows+=
           '<tr class="serial-detail-row'+(st==='GIVEN'?' st-given':st==='RECEIVED'?' st-received':' st-pending')+'">'
@@ -1560,7 +1622,7 @@ function renderLog(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SERIAL FIELD SAVE
+// SERIAL FIELD SAVE — with auto WA on RECEIVED / GIVEN
 // ═══════════════════════════════════════════════════════════════════
 function saveSerialField(slip,ii,si,field,value){
   value=(value||'').trim();
@@ -1591,6 +1653,14 @@ function saveSerialField(slip,ii,si,field,value){
   renderLog();
   renderStats();
   toast('Saved');
+
+  // ── AUTO WHATSAPP NOTIFY ──────────────────────────────────────────
+  if(field==='status' && (value==='RECEIVED' || value==='GIVEN')){
+    var itName=(e.items[ii]||{}).name||'';
+    var snVal=s.sn||'';
+    var dgVal=s.dateGiven||'';
+    fireStatusWA(slip, itName, snVal, value, dgVal);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2224,6 +2294,7 @@ function toast(msg,warn){
 window.onload=function(){
   initData();
   initForm();
+  renderWAToggle();
   if(loadGASUrl()){
     pullAll(true);
     setInterval(function(){ if(loadGASUrl()) pullAll(true); }, 60000);
