@@ -1552,9 +1552,7 @@ function renderLog(){
           : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
       }
 
-     var pcs = (it.serials && it.serials.length > 0)
-  ? it.serials.filter(function(s){return s.sn;}).length || it.serials.length
-  : (parseInt(it.qty) || 1);
+     var pcs = parseInt(it.qty) || 1;
       detailRows +=
         '<tr class="item-header-row">'
         +'<td colspan="5" style="padding:5px 10px 2px 18px;font-size:11.5px;font-weight:700;color:var(--navy2)">'
