@@ -1406,6 +1406,15 @@ function collectItems(){
       var rm=rmEls[i]?rmEls[i].value.trim():'';
       serials.push({sn:sn,remark:rm,status:'PENDING',dateGiven:'',received:''});
     });
+    // If qty > 1 but only 1 blank serial entered, auto-expand into N separate pieces
+    var allBlank = serials.length <= 1 && serials.every(function(s){return !s.sn;});
+    if(allBlank && qty > 1){
+      var sharedRemark = serials.length ? serials[0].remark : '';
+      serials = [];
+      for(var k=0; k<qty; k++){
+        serials.push({sn:'', remark:sharedRemark, status:'PENDING', dateGiven:'', received:''});
+      }
+    }
     if(!serials.length) serials=[{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
     items.push({name:name,qty:qty,serials:serials});
   });
