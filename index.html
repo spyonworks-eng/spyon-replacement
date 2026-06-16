@@ -1071,9 +1071,20 @@ function sendFilteredReportWA(){
   var fs=(document.getElementById('rpt-filter')||{value:'all'}).value;
   var filterLabel=fs==='all'?'All Items':fs+' Items';
 
-  // Build message grouped by slip
-  var bySlip={};var slipOrder=[];
+  // Group no-serial rows same way as report table
+  var groupMap2={};var displayRows2=[];
   rows.forEach(function(r){
+    if(r.sn&&r.sn!=='-'&&r.sn!=='\u2014'){
+      displayRows2.push(Object.assign({},r,{_pcs:null}));
+    } else {
+      var key=r.slip+'|'+r.item+'|'+r.status;
+      if(groupMap2[key]!==undefined){ displayRows2[groupMap2[key]]._pcs++; }
+      else { groupMap2[key]=displayRows2.length; displayRows2.push(Object.assign({},r,{_pcs:1})); }
+    }
+  });
+
+  var bySlip={};var slipOrder=[];
+  displayRows2.forEach(function(r){
     if(!bySlip[r.slip]){bySlip[r.slip]={slip:r.slip,date:r.date,items:[]};slipOrder.push(r.slip);}
     bySlip[r.slip].items.push(r);
   });
@@ -1091,6 +1102,7 @@ function sendFilteredReportWA(){
     g.items.forEach(function(r,i){
       var emoji=statusEmoji[r.status]||'\u23F3';
       msg+=''+(i+1)+'. '+emoji+' '+r.item;
+      if(r._pcs!==null && r._pcs>1) msg+=' x'+r._pcs+' pcs';
       if(r.sn&&r.sn!=='-')msg+=' ['+r.sn+']';
       if(r.issue)msg+=' \u2014 '+r.issue;
       if(r.status==='GIVEN'&&r.dateGiven)msg+=' (Given: '+r.dateGiven+')';
@@ -2096,30 +2108,51 @@ function renderReport(){
   var tbody=document.getElementById('rpt-tbody');
   if(!tbody)return;
   if(!rows.length){tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted)">No data</td></tr>';return;}
+  // Group no-serial rows (same slip + item + status) into one row with pcs count.
+  // Rows with a serial number stay as individual rows.
+  var displayRows = [];
+  var groupMap = {}; // key: slip|item|status -> index in displayRows
+  rows.forEach(function(r){
+    if(r.sn && r.sn !== '-' && r.sn !== '\u2014'){
+      // Has a serial — keep as individual row, mark pcs=null (show serial instead)
+      displayRows.push(Object.assign({},r,{_pcs:null}));
+    } else {
+      var key = r.slip+'|'+r.item+'|'+r.status;
+      if(groupMap[key]!==undefined){
+        displayRows[groupMap[key]]._pcs++;
+      } else {
+        groupMap[key]=displayRows.length;
+        displayRows.push(Object.assign({},r,{_pcs:1}));
+      }
+    }
+  });
+
   var lastSlip='';
-  tbody.innerHTML=rows.map(function(r){
+  tbody.innerHTML=displayRows.map(function(r){
     var isNew=(String(r.slip)!==String(lastSlip));lastSlip=String(r.slip);
-    var bc=r.status==='GIVEN'?'bg':(r.status==='RECEIVED'?'bg':'bp');
-    var badgeColor=r.status==='GIVEN'?'bg':(r.status==='RECEIVED'?'':'bp');
     var tr=document.createElement('tr');
     if(isNew)tr.style.borderTop='2px solid #e0e4ef';
+    var snCell = r._pcs===null
+      ? '<span style="font-family:monospace;font-size:11px">'+r.sn+'</span>'
+      : '<span style="font-size:11px;color:var(--muted)">—</span>';
+    var pcsCell = r._pcs!==null && r._pcs>1
+      ? ' <span style="background:#eef2ff;color:var(--navy2);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px">'+r._pcs+' pcs</span>'
+      : '';
     tr.innerHTML='<td>'+(isNew?'<span class="sno">#'+r.slip+'</span>':'')+'</td>'
       +'<td>'+(isNew?r.date:'')+'</td>'
       +'<td>'+(isNew?'<b>'+r.cname+'</b>':'')+'</td>'
       +'<td style="font-size:11px">'+(isNew&&r.phone?r.phone:'')+'</td>'
       +'<td style="font-size:11px">'+(isNew&&r.staff?r.staff:'')+'</td>'
-      +'<td style="font-size:11.5px">'+r.item+'</td>'
-      +'<td style="font-family:monospace;font-size:11px">'+(r.sn||'—')+'</td>'
+      +'<td style="font-size:11.5px">'+r.item+pcsCell+'</td>'
+      +'<td>'+snCell+'</td>'
       +'<td style="font-size:11px;color:var(--red)">'+(r.issue||'')+'</td>'
       +'<td><span class="badge '+(r.status==='GIVEN'?'bg':'bp')+'">'+r.status+'</span></td>'
       +'<td style="font-size:11px">'+(r.dateGiven||'—')+'</td>'
       +'<td style="font-size:11px">'+(r.received||'—')+'</td>'
       +'<td style="white-space:nowrap"></td>';
-    // Print button
     var pBtn=document.createElement('button');
     pBtn.className='pbtn';pBtn.textContent='\uD83D\uDDA8';pBtn.title='Print slip';
     pBtn.onclick=function(){printCustomerReport(r.cname);};
-    // WA button (per-row: sends the full slip WA message for that slip)
     var wBtn=document.createElement('button');
     wBtn.className='pbtn wa';wBtn.textContent='\uD83D\uDCAC';wBtn.title='WhatsApp this slip';
     wBtn.onclick=function(){waBySlip(r.slip);};
