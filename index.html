@@ -353,7 +353,10 @@ td{padding:7px 10px;vertical-align:top}
     </div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
       <button class="wa-notify-ready-btn" id="wa-notify-ready-btn" onclick="notifyReadyItems()" title="Send one WhatsApp with all RECEIVED items for this customer">
-        &#128242; Notify Ready Items
+        📲 Notify Ready Items
+      </button>
+      <button class="wa-notify-ready-btn" id="wa-filtered-report-btn" onclick="sendFilteredReportWA()" title="Send the full filtered report as a WhatsApp message" style="display:none;background:#1a7a42">
+        💬 Send Report on WA
       </button>
       <button class="ebtn" onclick="exportReportCSV()">&#8595; Export CSV</button>
       <button class="ebtn" style="background:var(--orange)" onclick="printAllReport()">&#128424; Print Filtered</button>
@@ -1031,12 +1034,81 @@ function notifyReadyItems(){
 
 function _updateNotifyReadyBtn(){
   var btn=document.getElementById('wa-notify-ready-btn');
-  if(!btn) return;
-  if(_rptCustFilter){
-    btn.classList.add('visible');
-  } else {
-    btn.classList.remove('visible');
+  var btn2=document.getElementById('wa-filtered-report-btn');
+  if(btn){
+    if(_rptCustFilter){ btn.classList.add('visible'); }
+    else { btn.classList.remove('visible'); }
   }
+  // "Send Report on WA" shows whenever a customer is filtered (regardless of status filter)
+  if(btn2){
+    btn2.style.display=_rptCustFilter ? 'flex' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEND FILTERED REPORT ON WHATSAPP
+// Sends the currently visible filtered report as a text WA message.
+// Works for any status filter (All / Pending / Received / Given).
+// ═══════════════════════════════════════════════════════════════════
+function sendFilteredReportWA(){
+  if(!_rptCustFilter){ toast('Filter by a customer first',1); return; }
+  var rows=_lastReportRows;
+  if(!rows||!rows.length){ toast('No data to send',1); return; }
+
+  // Get phone for this customer
+  var log=loadLog();
+  var custEntries=log.filter(function(e){ return e.cname===_rptCustFilter; });
+  var phone='';
+  for(var i=0;i<custEntries.length;i++){
+    if(custEntries[i].phone){ phone=custEntries[i].phone; break; }
+  }
+  var ph=(phone||'').replace(/\D/g,'');
+  if(ph.length===10) ph='91'+ph;
+  else if(ph.length===11&&ph[0]==='0') ph='91'+ph.slice(1);
+  if(!ph||ph.length<12){ toast('No phone number saved for '+_rptCustFilter,1); return; }
+
+  // Get current filter label
+  var fs=(document.getElementById('rpt-filter')||{value:'all'}).value;
+  var filterLabel=fs==='all'?'All Items':fs+' Items';
+
+  // Build message grouped by slip
+  var bySlip={};var slipOrder=[];
+  rows.forEach(function(r){
+    if(!bySlip[r.slip]){bySlip[r.slip]={slip:r.slip,date:r.date,items:[]};slipOrder.push(r.slip);}
+    bySlip[r.slip].items.push(r);
+  });
+
+  var statusEmoji={'PENDING':'\u23F3','RECEIVED':'\u2705','GIVEN':'\uD83D\uDCE6'};
+
+  var msg='*SpyOn \u2014 '+filterLabel+'*\n';
+  msg+='Customer: *'+_rptCustFilter+'*\n';
+  msg+='Date: '+_today()+'\n';
+  msg+='\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\n';
+
+  slipOrder.forEach(function(sn){
+    var g=bySlip[sn];
+    msg+='\n*Slip #'+g.slip+'* ('+g.date+')\n';
+    g.items.forEach(function(r,i){
+      var emoji=statusEmoji[r.status]||'\u23F3';
+      msg+=''+(i+1)+'. '+emoji+' '+r.item;
+      if(r.sn&&r.sn!=='-')msg+=' ['+r.sn+']';
+      if(r.issue)msg+=' \u2014 '+r.issue;
+      if(r.status==='GIVEN'&&r.dateGiven)msg+=' (Given: '+r.dateGiven+')';
+      msg+='\n';
+    });
+  });
+
+  msg+='\n\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015';
+  msg+='\nTotal: '+rows.length+' pcs';
+  var pending=rows.filter(function(r){return r.status==='PENDING';}).length;
+  var received=rows.filter(function(r){return r.status==='RECEIVED';}).length;
+  var given=rows.filter(function(r){return r.status==='GIVEN';}).length;
+  if(pending)msg+=' | \u23F3 '+pending+' Pending';
+  if(received)msg+=' | \u2705 '+received+' Ready';
+  if(given)msg+=' | \uD83D\uDCE6 '+given+' Given';
+  msg+='\n\n\u2014 SpyOn';
+
+  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 
@@ -1537,7 +1609,7 @@ async function submitEntry(){
 function _toastWithPrint(msg, entry){
   var t=document.getElementById('toast');
   var tmsg=document.getElementById('tmsg');
-  tmsg.innerHTML=msg+' &nbsp;<button onclick="printSlip(window._lastEntry)" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700;margin-left:4px">&#128424; Print</button>';
+  tmsg.innerHTML=msg+' &nbsp;<button onclick="printSlip(window._lastEntry)" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700;margin-left:4px">\uD83D\uDDA8 Print</button>';
   window._lastEntry=entry;
   t.style.background='var(--navy)';
   t.classList.add('on');
@@ -1685,10 +1757,10 @@ function renderLog(){
       +(e.remarks?'<span style="color:var(--muted);font-size:11px;font-style:italic">'+e.remarks+'</span>':'')
       +'</div></td>'
       +'<td style="padding:9px 10px 4px;text-align:right;white-space:nowrap">'
-      +'<button class="pbtn" onclick="printBySlip('+e.slip+')" title="Print">&#128424;</button>'
-      +'<button class="pbtn wa" onclick="waBySlip('+e.slip+')" title="WhatsApp">&#128172;</button>'
-      +'<button class="pbtn ed" onclick="openEdit('+e.slip+')" title="Edit">&#9998;</button>'
-      +'<button class="pbtn del" onclick="deleteSlip('+e.slip+')" title="Delete">&#128465;</button>'
+      +'<button class="pbtn" onclick="printBySlip('+e.slip+')" title="Print">\uD83D\uDDA8</button>'
+      +'<button class="pbtn wa" onclick="waBySlip('+e.slip+')" title="WhatsApp">\uD83D\uDCAC</button>'
+      +'<button class="pbtn ed" onclick="openEdit('+e.slip+')" title="Edit">\u270F</button>'
+      +'<button class="pbtn del" onclick="deleteSlip('+e.slip+')" title="Delete">\uD83D\uDDD1</button>'
       +'</td></tr>'
       +'<tr class="item-cols-header">'
       +'<td style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;padding:3px 10px 3px 28px">Serial / Piece</td>'
@@ -2045,11 +2117,11 @@ function renderReport(){
       +'<td style="white-space:nowrap"></td>';
     // Print button
     var pBtn=document.createElement('button');
-    pBtn.className='pbtn';pBtn.textContent='&#128424;';pBtn.title='Print';
+    pBtn.className='pbtn';pBtn.textContent='\uD83D\uDDA8';pBtn.title='Print slip';
     pBtn.onclick=function(){printCustomerReport(r.cname);};
     // WA button (per-row: sends the full slip WA message for that slip)
     var wBtn=document.createElement('button');
-    wBtn.className='pbtn wa';wBtn.textContent='&#128172;';wBtn.title='WhatsApp this slip';
+    wBtn.className='pbtn wa';wBtn.textContent='\uD83D\uDCAC';wBtn.title='WhatsApp this slip';
     wBtn.onclick=function(){waBySlip(r.slip);};
     var td=tr.querySelector('td:last-child');
     td.appendChild(pBtn);
