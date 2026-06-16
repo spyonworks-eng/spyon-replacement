@@ -137,7 +137,6 @@ td{padding:7px 10px;vertical-align:top}
 .item-stat-sel{outline:none;padding:3px 5px;border-radius:5px;border:1.5px solid #d4dae8;
   font-family:inherit;font-size:11px;background:#fafbfd;cursor:pointer;min-width:85px}
 .item-stat-sel:focus{border-color:var(--orange)!important}
-/* Item row status colors in log */
 .serial-detail-row.st-pending > td:first-child,
 .serial-detail-row.st-pending > td:first-child .isrl,
 .serial-detail-row.st-pending > td:first-child .irm { color: var(--red) !important; font-weight: 600; }
@@ -145,7 +144,6 @@ td{padding:7px 10px;vertical-align:top}
 .serial-detail-row.st-given > td:first-child .isrl { color: var(--green) !important; font-weight: 600; }
 .serial-detail-row.st-received > td:first-child,
 .serial-detail-row.st-received > td:first-child .isrl { color: var(--orange) !important; font-weight: 600; }
-/* Upward autocomplete */
 .acl.upward{top:auto;bottom:100%;border-top:1.5px solid var(--orange);border-bottom:none;border-radius:7px 7px 0 0;box-shadow:0 -8px 20px rgba(0,0,0,.12)}
 .mibar{display:flex;gap:8px;margin-bottom:10px}
 .mibar input{flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid #d4dae8;font-family:inherit;font-size:13px;outline:none}
@@ -169,7 +167,6 @@ td{padding:7px 10px;vertical-align:top}
   box-shadow:0 6px 20px rgba(0,0,0,.2);transform:translateY(80px);opacity:0;
   transition:all .3s;z-index:9999;display:flex;align-items:center;gap:7px}
 .toast.on{transform:translateY(0);opacity:1}
-/* EDIT MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center}
 .modal-bg.on{display:flex}
 .modal{background:#fff;border-radius:12px;width:min(600px,95vw);max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -178,9 +175,7 @@ td{padding:7px 10px;vertical-align:top}
 .modal-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px}
 .modal-body{padding:16px}
 .modal-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
-/* SYNC STATUS BAR */
 .sync-status-bar{background:var(--navy2);color:#fff;text-align:center;font-size:11px;padding:4px;font-weight:600;letter-spacing:.3px}
-/* WA AUTO NOTIFY TOGGLE */
 .wa-toggle{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:6px;
   border:1.5px solid #25d366;background:#e8fdf0;color:#1a7a42;cursor:pointer;
   font-family:inherit;font-size:12px;font-weight:700;white-space:nowrap;
@@ -188,7 +183,12 @@ td{padding:7px 10px;vertical-align:top}
 .wa-toggle.off{border-color:#d4dae8;background:#f4f6fa;color:var(--muted)}
 .wa-toggle .wdot{width:8px;height:8px;border-radius:50%;background:#25d366;flex-shrink:0;transition:background .15s}
 .wa-toggle.off .wdot{background:#ccc}
-/* PRINT */
+/* NOTIFY READY BUTTON */
+.wa-notify-ready-btn{display:none;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;
+  border:none;background:#25d366;color:#fff;cursor:pointer;font-family:inherit;
+  font-size:12px;font-weight:700;white-space:nowrap}
+.wa-notify-ready-btn:hover{background:#1da851}
+.wa-notify-ready-btn.visible{display:flex}
 #rct{display:none;font-family:'Courier New',Courier,monospace;color:#000;background:#fff;width:72mm;padding:2mm;line-height:1.5}
 @media print{
   body>*:not(#rct){display:none!important;visibility:hidden!important;}
@@ -198,7 +198,6 @@ td{padding:7px 10px;vertical-align:top}
 </style>
 </head>
 <body>
-
 <div id="sync-bar" class="sync-status-bar" style="display:none"></div>
 
 <div class="topbar">
@@ -212,15 +211,15 @@ td{padding:7px 10px;vertical-align:top}
     <button class="ntab"     onclick="tab('items',this)">Items</button>
     <button class="ntab"     onclick="tab('report',this)">Report</button>
     <button class="ntab"     onclick="tab('contacts',this)">Contacts</button>
-    <button class="ntab"     onclick="tab('sync',this)">⚙ Sync</button>
+    <button class="ntab"     onclick="tab('sync',this)">&#9881; Sync</button>
     <button class="ntab"     onclick="tab('backup',this)">Backup</button>
   </div>
 </div>
 
-<!-- ═══ NEW ENTRY ═══════════════════════════════════════════════════ -->
+<!-- NEW ENTRY -->
 <div id="p-form" class="panel on">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <div class="sbadge">Slip <em>#<span id="slip-disp">—</span></em></div>
+    <div class="sbadge">Slip <em>#<span id="slip-disp">&#8212;</span></em></div>
     <span style="font-size:11px;color:var(--muted)">Auto-assigned on submit</span>
   </div>
   <div class="card">
@@ -262,7 +261,7 @@ td{padding:7px 10px;vertical-align:top}
   </div>
   <div class="card">
     <div class="ch"><div class="dot"></div>Items Received for Replacement
-      <span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.4)">Multiple items · Multiple S/Ns</span>
+      <span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.4)">Multiple items &middot; Multiple S/Ns</span>
     </div>
     <div class="cb">
       <div class="ith">
@@ -272,10 +271,10 @@ td{padding:7px 10px;vertical-align:top}
       <button class="addbtn" onclick="addRow()">+ Add another item</button>
     </div>
   </div>
-  <button class="subbtn" onclick="submitEntry()">✓ &nbsp;Submit &amp; Save — Print Slip</button>
+  <button class="subbtn" onclick="submitEntry()">&#10003; &nbsp;Submit &amp; Save &mdash; Print Slip</button>
 </div>
 
-<!-- ═══ LOG ══════════════════════════════════════════════════════════ -->
+<!-- LOG -->
 <div id="p-log" class="panel">
   <div class="stats" id="stats-row"></div>
   <div class="lbar">
@@ -286,8 +285,8 @@ td{padding:7px 10px;vertical-align:top}
       <option value="GIVEN">Given</option>
     </select>
     <select class="fsel" id="fcust" onchange="renderLog()"><option value="">All Customers</option></select>
-    <button class="ebtn" onclick="syncFromCloud()" title="Refresh from Google Sheets">↻ Refresh</button>
-    <button class="ebtn" onclick="exportCSV()">↓ CSV</button>
+    <button class="ebtn" onclick="syncFromCloud()" title="Refresh from Google Sheets">&#8635; Refresh</button>
+    <button class="ebtn" onclick="exportCSV()">&#8595; CSV</button>
     <button class="wa-toggle" id="wa-toggle-btn" onclick="toggleWANotify()" title="Auto-send WhatsApp when status changes to RECEIVED or GIVEN">
       <span class="wdot"></span><span id="wa-toggle-lbl">WA Notify: ON</span>
     </button>
@@ -306,7 +305,7 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ ITEMS ════════════════════════════════════════════════════════ -->
+<!-- ITEMS -->
 <div id="p-items" class="panel">
   <div class="card">
     <div class="ch"><div class="dot"></div>Manage Item List</div>
@@ -322,7 +321,7 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ REPORT ═══════════════════════════════════════════════════════ -->
+<!-- REPORT -->
 <div id="p-report" class="panel">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -340,21 +339,24 @@ td{padding:7px 10px;vertical-align:top}
       <div style="display:flex;align-items:center;gap:4px;background:#f4f6fa;border:1.5px solid #d4dae8;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--muted)">
         <span>Date:</span>
         <input id="rpt-date-from" type="text" placeholder="From DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
-        <span>–</span>
+        <span>&ndash;</span>
         <input id="rpt-date-to" type="text" placeholder="To DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
-        <button onclick="document.getElementById('rpt-date-from').value='';document.getElementById('rpt-date-to').value='';renderReport();" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px" title="Clear dates">✕</button>
+        <button onclick="document.getElementById('rpt-date-from').value='';document.getElementById('rpt-date-to').value='';renderReport();" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px" title="Clear dates">&times;</button>
       </div>
       <div style="display:flex;align-items:center;gap:4px;background:#f4f6fa;border:1.5px solid #d4dae8;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--muted)">
         <span>Given:</span>
         <input id="rpt-dgiven-from" type="text" placeholder="From DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
-        <span>–</span>
+        <span>&ndash;</span>
         <input id="rpt-dgiven-to" type="text" placeholder="To DD.MM.YY" oninput="renderReport()" style="width:90px;border:none;background:transparent;font-family:inherit;font-size:11px;outline:none;color:var(--text)">
-        <button onclick="document.getElementById('rpt-dgiven-from').value='';document.getElementById('rpt-dgiven-to').value='';renderReport();" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px" title="Clear">✕</button>
+        <button onclick="document.getElementById('rpt-dgiven-from').value='';document.getElementById('rpt-dgiven-to').value='';renderReport();" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px" title="Clear">&times;</button>
       </div>
     </div>
-    <div style="display:flex;gap:7px">
-      <button class="ebtn" onclick="exportReportCSV()">↓ Export CSV</button>
-      <button class="ebtn" style="background:var(--orange)" onclick="printAllReport()">🖨 Print Filtered</button>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+      <button class="wa-notify-ready-btn" id="wa-notify-ready-btn" onclick="notifyReadyItems()" title="Send one WhatsApp with all RECEIVED items for this customer">
+        &#128242; Notify Ready Items
+      </button>
+      <button class="ebtn" onclick="exportReportCSV()">&#8595; Export CSV</button>
+      <button class="ebtn" style="background:var(--orange)" onclick="printAllReport()">&#128424; Print Filtered</button>
     </div>
   </div>
   <div id="rpt-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
@@ -362,25 +364,25 @@ td{padding:7px 10px;vertical-align:top}
     <table>
       <thead><tr>
         <th>Slip#</th><th>Date</th><th>Customer</th><th>Phone</th><th>Staff</th>
-        <th>Item</th><th>Serial</th><th>Issue</th><th>Status</th><th>Date Given</th><th>Received</th><th>Print</th>
+        <th>Item</th><th>Serial</th><th>Issue</th><th>Status</th><th>Date Given</th><th>Received</th><th>Print/WA</th>
       </tr></thead>
       <tbody id="rpt-tbody"></tbody>
     </table>
   </div>
 </div>
 
-<!-- ═══ CONTACTS ════════════════════════════════════════════════════ -->
+<!-- CONTACTS -->
 <div id="p-contacts" class="panel">
   <div class="card">
     <div class="ch"><div class="dot"></div>Customer Contacts</div>
     <div class="cb">
       <div style="background:#f0f6ff;border:1px solid #c5d8ff;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.7">
-        Upload CSV: <b>Name,Phone</b> (header row first) · e.g. <code>Lucky Ji,9876543210</code><br>
+        Upload CSV: <b>Name,Phone</b> (header row first) &middot; e.g. <code>Lucky Ji,9876543210</code><br>
         Contacts also <b>auto-save</b> when you submit a new slip.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <label style="padding:7px 14px;background:var(--navy);color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
-          ↑ Upload CSV<input type="file" accept=".csv" onchange="importContacts(this)" style="display:none">
+          &#8679; Upload CSV<input type="file" accept=".csv" onchange="importContacts(this)" style="display:none">
         </label>
         <button class="ebtn" onclick="addContactManual()">+ Add Manually</button>
         <button class="ebtn" style="background:var(--red)" onclick="clearContacts()">Clear All</button>
@@ -402,18 +404,18 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ SYNC ══════════════════════════════════════════════════════════ -->
+<!-- SYNC -->
 <div id="p-sync" class="panel">
   <div class="card">
-    <div class="ch"><div class="dot"></div>Google Sheets — Two-Way Cloud Sync</div>
+    <div class="ch"><div class="dot"></div>Google Sheets &mdash; Two-Way Cloud Sync</div>
     <div class="cb">
       <div class="sync-box">
         <h3>Setup Instructions (one time)</h3>
         <p>
-          1. Go to <b>sheets.google.com</b> → create a new sheet → name the first tab: <code>REPLACEMENT LOG</code><br>
-          2. Click <b>Extensions → Apps Script</b> → delete existing code → paste the code below → Save<br>
-          3. Click <b>Deploy → New deployment</b> → type: <code>Web app</code> → Execute as: <code>Me</code> → Access: <code>Anyone</code> → Deploy<br>
-          4. Authorise → copy the Web App URL → paste below → click Connect
+          1. Go to <b>sheets.google.com</b> &rarr; create a new sheet &rarr; name the first tab: <code>REPLACEMENT LOG</code><br>
+          2. Click <b>Extensions &rarr; Apps Script</b> &rarr; delete existing code &rarr; paste the code below &rarr; Save<br>
+          3. Click <b>Deploy &rarr; New deployment</b> &rarr; type: <code>Web app</code> &rarr; Execute as: <code>Me</code> &rarr; Access: <code>Anyone</code> &rarr; Deploy<br>
+          4. Authorise &rarr; copy the Web App URL &rarr; paste below &rarr; click Connect
         </p>
       </div>
       <div class="f" style="margin-bottom:10px">
@@ -421,18 +423,18 @@ td{padding:7px 10px;vertical-align:top}
         <input class="sid-inp" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveGASUrl()">
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-        <button class="synbtn" style="background:var(--orange);font-size:13px;padding:10px 20px" onclick="testConnection()">🔗 Test Connection</button>
-        <button class="synbtn" style="background:var(--navy);font-size:13px;padding:10px 20px" onclick="pushAll()">⬆ Push All Changes</button>
-        <button class="synbtn" style="background:var(--green);font-size:13px;padding:10px 20px" onclick="pullAll(false)">⬇ Pull All</button>
+        <button class="synbtn" style="background:var(--orange);font-size:13px;padding:10px 20px" onclick="testConnection()">&#128279; Test Connection</button>
+        <button class="synbtn" style="background:var(--navy);font-size:13px;padding:10px 20px" onclick="pushAll()">&#11014; Push All Changes</button>
+        <button class="synbtn" style="background:var(--green);font-size:13px;padding:10px 20px" onclick="pullAll(false)">&#11015; Pull All</button>
       </div>
       <div style="background:#f0f8ff;border:1px solid #c5d8f5;border-radius:7px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.8">
-        <b style="color:var(--navy2)">⬆ Push All Changes</b> — sends only new or changed slips to Sheets (smart diff, never wipes). Also pushes contacts and items.<br>
-        <b style="color:var(--navy2)">⬇ Pull All</b> — pulls slips, contacts and items from Sheets and merges into this device.<br>
-        <b style="color:var(--navy2)">Auto-sync</b> — app pulls automatically when opened and every 60 seconds in the background.
+        <b style="color:var(--navy2)">&#11014; Push All Changes</b> &mdash; sends only new or changed slips to Sheets.<br>
+        <b style="color:var(--navy2)">&#11015; Pull All</b> &mdash; pulls slips, contacts and items from Sheets and merges into this device.<br>
+        <b style="color:var(--navy2)">Auto-sync</b> &mdash; app pulls automatically when opened and every 60 seconds in the background.
       </div>
       <div id="sync-status-msg" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
       <div class="card" style="margin-bottom:0">
-        <div class="ch"><div class="dot"></div>Apps Script Code — paste into your Google Sheet</div>
+        <div class="ch"><div class="dot"></div>Apps Script Code &mdash; paste into your Google Sheet</div>
         <div class="cb">
           <pre id="gas-code" style="font-family:var(--mono);font-size:11px;background:#f4f6fa;
             padding:12px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;
@@ -444,26 +446,26 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ BACKUP ════════════════════════════════════════════════════════ -->
+<!-- BACKUP -->
 <div id="p-backup" class="panel">
   <div class="card">
     <div class="ch"><div class="dot"></div>Backup &amp; Restore</div>
     <div class="cb">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
         <div style="background:#f0f6ff;border:1px solid #c5d8ff;border-radius:8px;padding:14px">
-          <div style="font-size:13px;font-weight:700;color:var(--navy2);margin-bottom:6px">💾 Download Backup</div>
+          <div style="font-size:13px;font-weight:700;color:var(--navy2);margin-bottom:6px">&#128190; Download Backup</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">
             Saves all slips, items and contacts as a JSON file. Keep in Google Drive or WhatsApp.
           </div>
-          <button class="subbtn" onclick="downloadBackup()" style="font-size:12px;padding:9px">💾 Download Backup</button>
+          <button class="subbtn" onclick="downloadBackup()" style="font-size:12px;padding:9px">&#128190; Download Backup</button>
         </div>
         <div style="background:var(--gbg);border:1px solid #b2dfcc;border-radius:8px;padding:14px">
-          <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">🔄 Restore from Backup</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">&#128260; Restore from Backup</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">
             Upload backup file to restore. <b style="color:var(--red)">Replaces all current data.</b>
           </div>
           <label style="display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;background:var(--green);color:#fff;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">
-            🔄 Upload Backup<input type="file" accept=".json" onchange="restoreBackup(this)" style="display:none">
+            &#128260; Upload Backup<input type="file" accept=".json" onchange="restoreBackup(this)" style="display:none">
           </label>
         </div>
       </div>
@@ -474,15 +476,15 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ DELETE CONFIRM MODAL ══════════════════════════════════════════ -->
+<!-- DELETE MODAL -->
 <div class="modal-bg" id="del-modal">
   <div class="modal" style="max-width:380px">
     <div class="modal-head" style="background:var(--red)">
-      <h3>🗑 Delete Slip</h3>
-      <button class="modal-close" onclick="document.getElementById('del-modal').classList.remove('on')">✕</button>
+      <h3>&#128465; Delete Slip</h3>
+      <button class="modal-close" onclick="document.getElementById('del-modal').classList.remove('on')">&times;</button>
     </div>
     <div class="modal-body" style="text-align:center;padding:22px 20px">
-      <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+      <div style="font-size:32px;margin-bottom:10px">&#9888;&#65039;</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Delete Slip <span id="del-slip-label"></span>?</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:20px">This action cannot be undone. The slip will be permanently removed from the log.</div>
       <div style="display:flex;gap:10px;justify-content:center">
@@ -493,12 +495,12 @@ td{padding:7px 10px;vertical-align:top}
   </div>
 </div>
 
-<!-- ═══ EDIT MODAL ═══════════════════════════════════════════════════ -->
+<!-- EDIT MODAL -->
 <div class="modal-bg" id="edit-modal">
   <div class="modal">
     <div class="modal-head">
       <h3>Edit Slip #<span id="edit-slip-num"></span></h3>
-      <button class="modal-close" onclick="closeEdit()">✕</button>
+      <button class="modal-close" onclick="closeEdit()">&times;</button>
     </div>
     <div class="modal-body">
       <div class="fr c2">
@@ -519,19 +521,18 @@ td{padding:7px 10px;vertical-align:top}
       <div class="fr c1">
         <div class="f"><label>Remarks</label><input id="edit-remarks"></div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px">Items & Serials</div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px">Items &amp; Serials</div>
       <div id="edit-items-list" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto"></div>
     </div>
     <div class="modal-foot">
       <button class="ebtn" onclick="closeEdit()">Cancel</button>
-      <button class="subbtn" style="width:auto;padding:9px 20px;font-size:13px" onclick="saveEdit()">✓ Save Changes</button>
+      <button class="subbtn" style="width:auto;padding:9px 20px;font-size:13px" onclick="saveEdit()">&#10003; Save Changes</button>
     </div>
   </div>
 </div>
 
 <div id="rct"></div>
 <div class="toast" id="toast"><span id="tmsg"></span></div>
-
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // APPS SCRIPT CODE (shown in Sync tab)
@@ -825,10 +826,12 @@ function writeDeleted(slips) {
   sh.getRange(2, 1, rows.length, 1).setValues(rows);
 }`;
 
+
 // ═══════════════════════════════════════════════════════════════════
 // ITEM LIST
 // ═══════════════════════════════════════════════════════════════════
 var DEFAULT_ITEMS = ["4X4 BOX","4.5x4.5 BOX","5X5 BOX","ADP","ADP HANDSET","ADP SUPPLY","ADR 1A","ADR 2A","ADR 3A","ADR 5A","ADR 5V1A","ADR 6V1A","ADR 9V1A","AIR MOUSE","ANDROID 4G BULLET","ANDROID 4G DOME","ANDROID 4G PTZ","ANDROID WIFI PTZ","ANDROID WIFI ROBOT","ARRAY ILLUMINATOR","AV TO HDMI","AV TO VGA","BALUN","BIOMETRICS","BNC BIG","BNC BLUE","BNC BLUE HEAVY","BNC GREEN","BNC RUBBER BRASS","BNC SMALL","BNC SPYON","BODY BULLET","BODY DOME","BULLET 3MP STAR","BULLET 4MP IP","BULLET 5MP","BULLET BOX","CABLE 2+59 CCS","CABLE 2+59 COPPER","CABLE 3+1","CABLE 4+2","CAMERA OEM","CARD READER","CASH COUNTING MACHINE","CE HDD 1TB","CE HDD 500GB","CHROMECAST","COMATE 4G DUAL LENS PTZ","COMATE 4G SOLAR PTZ","CONNECTORS","CONS 4TB","CONS HDD 1TB","CONS HDD 2TB","CONS HDD 3TB","CONS HDD 500 GB","CONS HDD 6TB","CP BULL 2MP IP","CP BULLET 2.4 COS","CP BULLET 2.4 GAURD","CP BULLET 2MP AUD","CP BULLET 2MP ILLUMAX","CP BULLET 4G","CP BULLET 4MP IP AUDIO","CP BULLET 4MP IP ILLUMAX","CP BULLET 5MP","CP BULLET 5MP GAURD","CP BULLET 5MP ILLUMAX","CP CABLE 3+1","CP DOME 2.4 AST","CP DOME 2.4 COS","CP DOME 2.4 GAURD","CP DOME 2MP AUD","CP DOME 2MP ILLUMAX","CP DOME 2MP IP","CP DOME 2MP IP AUD","CP DOME 4MP IP ILLUMAX","CP DOME 5MP GAURD","CP DOME 5MP GUARD","CP DVR 16 CH COS","CP DVR 16CH 5MP","CP DVR 32CH","CP DVR 4CH 5MP","CP DVR 4CH IND","CP DVR 8 CH 5MP","CP DVR 8 CH IND","CP LOCK","CP NVR 16 CH","CP NVR 16 CH 2 HDD","CP NVR 32CH","CP NVR 4CH","CP NVR 8 CH","CP POE 4 CH GIGA","CP POE 4CH","CP POE 8 CH","CP POE 8CH GIGA","CP PS 16 CH","CP PS 4 CH","CP PS 8 CH","CP ROUTER 4G","CP VDP","CP WIFI 4G DOME","CP WIFI BULLET V41A","CP WIFI E24A","CP WIFI E28A","CP WIFI E31 3MP","CP WIFI E38A","CP WIFI E41A","CP WIFI E48A","CP WIFI P21","CP WIFI P23","CP WIFI P33","CP WIFI P34Q","CP WIFI PTZ Z32G","CP WIFI Z43A","DAHUA","DC FEMALE","DC HEAVY","DC RED BLACK","DC WHITE","DH BULLET 2MP","DH BULLET 4MP IP","DH DOME 2MP","DH DOME 2MP AUD","DH DOME 2MP IP","DH DVR 4CH","DH DVR 8CH","DH NVR 4","DH NVR 8CH","DLINK 3+1","DLINK BULLET 2MP","DLINK DOME 2MP","DLINK DVR 4CH","DLINK DVR 8CH","DOME 3MP STAR","DOME 4MP IP","DOME 5MP","DOME BOX","DOME IP ECO","DOME STAND","DOORPHONE","DP TO HDMI","DROP BOLT LOCK","DVR 16CH 5MP XM","DVR 8CH XVR 1080","EM LOCK","EPABX 4CH","FAN","FISH EYE IP CAMERA","GEONIX HDD 1TB","GEONIX HDD 2TB","GEONIX HDD 3TB","GEONIX HDD 4 TB","GEONIX HDD 500GB","HARD DISK","HDD 1TB PURPLE","HDD 2TB PURPLE","HDD 4TB PURPLE","HDD 500GB","HDD 6 TB PURPLE","HDD POWER CABLE","HDD SATA CABLE","HDMI 10 M","HDMI 15MT","HDMI 20M","HDMI 25M","HDMI 3M","HDMI 5M","HDMI AND VGA","HDMI EXTENDER 30M","HDMI EXTENDER 60M","HDMI JOINTER","HDMI SPLITTER 1X2","HDMI SPLITTER 1X4","HDMI SWITCH R","HDMI TO AV","HDMI TO VGA","HDMI VIDEO CAPTURE","HIK BUL 2MP R","HIK BUL 5MP STAR","HIK BULL 2MP IP","HIK BULL 2MP STAR","HIK BULLET 2MP COLORVU","HIK BULLET 2MP DUAL LIGHT","HIK BULLET 4MP IP AUDIO","HIK BULLET 5MP COLORVU","HIK BULLET 5MP DUAL","HIK DOM 2MP E","HIK DOM 2MP R","HIK DOME 2MP COLORVU","HIK DOME 2MP DUAL LIGHT","HIK DOME 2MP IP","HIK DOME 2MP IP STAR","HIK DOME 2MP STAR","HIK DOME 4MP IP HYBRID","HIK DOME 5MP DUAL LIGHT","HIK DOME 5MP STAR","HIK DVR 16 CH E","HIK DVR 16 CH R","HIK DVR 4 CH E","HIK DVR 4CH R","HIK DVR 4CH 5MP","HIK DVR 8 CH E","HIK DVR 8 CH R","HIK DVR 8 CH 5MP","HIK NVR 16CH K1","HIK NVR 16CH Q1M","HIK NVR 32 CH K2","HIK NVR 4CH K1","HIK NVR 8 CH Q1M","HIK NVR 8CH K1","HIK POE 16CH","HIK POE 4CH","HIK POE 8CH","HIK PS 16CH","HIK PS 4CH","HIK PS 8CH","HIK VDP 202","HIK WIFI C1C","HIK WIFI C6N","HIK WIFI C8C","HIKVISION","HOUSING","IR ILL 12 ARR","IR ILL 15 ARR","IR ILL 8 ARR","IR LIGHT 30 ARR","KVM EXTENDER 60 MTR","L BRACKET","LAN CABLE 10M","LAN CABLE 20MTR","LAN CABLE 5M","LOCK","LOCK ANDROID","LOCK COIL","LOCK SUPPLY","LOCK SUPPLY RELAY","LOCK SUPPLY REMOTE","LOOSE CABLE","MIC BALL","MIC SMALL","MINI CAMERA ANALOG","MISC","MISC CAMERA","MISC ITEM","MISC VDP","MOTION SENSOR","MOUSE","MOUSE WIRELESS","NVR 16CH 4K","NVR 16CH XM","NVR 32 CH XM","PCB","PCB 2MP","PCB 4MP IP","PCB 5MP IP","PIN HOLE PCB 5MP","POE BOX","POE BOX MINI","POE EXTENDER","POE MULTIPLEX","POE SPLITTER","POE SWITCH 4CH","POE SWITCH 8CH","POE SWITCH 8CH GIGA","POWER CORD","POWER SUPPLY","PRAMA","PS 16 CH SINGLE","PS 4 CH SINGLE","PS 4CH DLX","PS 4CH STAR","PS 4CH MULTI","PS 8 CH DLX","PS 8 CH SINGLE","PS 8CH MULTI","PS 8CH STAR","PUSH BUTTON BIG","PUSH BUTTON METAL","RACK 2U","RACK 4U","RACKS","RAINPROOF COVER","RC","RC TO BNC","REMOTE LOCK","RF CARD","RF CARD READER","RF CARD RING TYPE","RJ 45","RJ 45 JOINTER","RJ 45 TO BNC","ROUTER","ROUTER 4G 4 ANTINA","ROUTER TENDA","SEAGATE HDD 4TB","SECURE EYE","SENSORS","SOLAR 4G PTZ V380 S","SPY AUDIO BUG","SPY AUDIO RECORDER","SPY BAT CAMERA","SPY CAMERAS","SPY HOLDER WIFI CAMERA","SPY PEN CAMERA V8","SPY PIN HOLE MIC CAMERA 2MP","SPY PINHOLE PCB CAMERA","SPY POCKET CAMERA","SPY SCREW CAMERA","SPY SNAKE CAMERA","SPY TABLE CLOCK","SPY TABLE CLOCK WIFI","SPY USB BUTTON CAMERA","SPY WALL CLOCK","SPY WIFI CHARGER","SPY WIFI MAGNET","SPYON BULLET 3MP STAR AUDIO","SPYON BULLET 5MP IP PREMIUM","SPYON DOME 3MP STAR AUDIO","SPYON DOME 5MP IP PREMIUM","STAND","STAND 1X1 FEET","STAND 2X2 FT","STAND METAL 6 INCHES","STAND METAL 8 INCHES","STAND POLE","STAND POLE BIG","STAND PVC 8INCH","SUNKAP LOCK SUPPLY","SUNKAP RAINPROOF COVER","SUNKAP REMOTE SUPPLY","THINKWILL ROUTER 4G","TRUE VIEW","TRUE VIEW BULLET 4MP IP","TRUE VIEW DOME 4MP IP","TRUEVIEW 4G DOME 8185","TRUEVIEW SOLAR 4G 8132","TURBO BULLET","TURBO DOME","TV BOX","TV BOX 2/16 MXQ","TV BOX 4/32","TV STICK AMAZONE LITE","TENDA SWITCH 5 PORT","TENDA SWITCH 8PORT","U BRACKET","USB 1.5MTR","USB 10MTR","USB 3MTR","USB 5MTR","USB CABLE","USB DOME","USB EXTENDER 50M","USB HUB","USB MALE FEMALE","USB TO RJ45","VGA 1.5M","VGA 10M","VGA 20M","VGA 3M","VGA 5M","VGA EXT 60M","VGA SPLITTER 1X4","VGA TO AV","VGA TO HDMI","WALKIE TALKIE","WEB CAMERA","WIFI AI V380","WIFI AI V380 COLOUR","WIFI BULB CAMERA","WIFI BULLET 4G","WIFI BULLET V380","WIFI CC AI","WIFI DOME CMOS","WIFI DOME XMEYE","WIFI LOCK SUPPLY","WIFI MINI CAMERA V380","WIFI MINI PTZ V380","WIFI PTZ 4G V380","WIFI PTZ BULB","WIFI PTZ CARECAM","WIFI PTZ V380","WIFI PTZ V380 5MP","WIFI PTZ XM","WIFI ROBOT DUAL XM","WIFI ROUND V380","WIFI SOLAR 4G V380","WIFI V380 2 ANTINA","WIFI V380 DUAL","WIRE TRACKER","Z BRACKET","Z44R","ZEBIOIN LED 20INCH"];
+
 
 // ═══════════════════════════════════════════════════════════════════
 // STORAGE
@@ -924,7 +927,6 @@ function renderWAToggle(){
   lbl.textContent='WA Notify: '+(on?'ON':'OFF');
 }
 
-// Build the WhatsApp message depending on status
 function buildStatusMsg(entry, itemName, sn, status, dateGiven){
   var name=entry.cname||'Customer';
   if(status==='RECEIVED'){
@@ -947,7 +949,6 @@ function buildStatusMsg(entry, itemName, sn, status, dateGiven){
   return null;
 }
 
-// Fire WhatsApp for a status change
 function fireStatusWA(slip, itemName, sn, status, dateGiven){
   if(!loadWANotify()) return;
   var log=loadLog();
@@ -966,6 +967,78 @@ function fireStatusWA(slip, itemName, sn, status, dateGiven){
     window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
   },400);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// NOTIFY READY ITEMS — Report Tab (NEW)
+// Sends ONE combined WhatsApp with all RECEIVED items for the
+// currently filtered customer, grouped by slip.
+// ═══════════════════════════════════════════════════════════════════
+function notifyReadyItems(){
+  if(!_rptCustFilter){ toast('Filter by a customer first',1); return; }
+  var log=loadLog();
+  var custEntries=log.filter(function(e){ return e.cname===_rptCustFilter; });
+  if(!custEntries.length){ toast('No slips found for this customer',1); return; }
+
+  // Find phone
+  var phone='';
+  for(var i=0;i<custEntries.length;i++){
+    if(custEntries[i].phone){ phone=custEntries[i].phone; break; }
+  }
+  var ph=(phone||'').replace(/\D/g,'');
+  if(ph.length===10) ph='91'+ph;
+  else if(ph.length===11&&ph[0]==='0') ph='91'+ph.slice(1);
+  if(!ph||ph.length<12){ toast('No phone number saved for '+_rptCustFilter,1); return; }
+
+  // Collect all RECEIVED serials grouped by slip
+  var readyBySlip=[];
+  custEntries.forEach(function(e){
+    var slipItems=[];
+    (e.items||[]).forEach(function(it){
+      (it.serials||[]).forEach(function(s){
+        if((s.status||'PENDING')==='RECEIVED'){
+          slipItems.push({ item:it.name, sn:s.sn||'' });
+        }
+      });
+    });
+    if(slipItems.length) readyBySlip.push({ slip:e.slip, date:e.date, items:slipItems });
+  });
+
+  if(!readyBySlip.length){
+    toast('No RECEIVED items for '+_rptCustFilter,1);
+    return;
+  }
+
+  // Build combined message
+  var totalCount=0;
+  readyBySlip.forEach(function(g){ totalCount+=g.items.length; });
+
+  var msg='Dear *'+_rptCustFilter+'*,\n\n';
+  msg+='The following item'+(totalCount>1?'s are':'is')+' ready for pickup:\n';
+
+  readyBySlip.forEach(function(g){
+    msg+='\n*Slip #'+g.slip+'* ('+g.date+'):';
+    g.items.forEach(function(it,idx){
+      msg+='\n  '+(idx+1)+'. '+it.item;
+      if(it.sn) msg+=' (S/N: '+it.sn+')';
+    });
+  });
+
+  msg+='\n\nKindly visit *SpyOn* to collect your item'+(totalCount>1?'s':'')+' at your convenience.';
+  msg+='\n\n— SpyOn';
+
+  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function _updateNotifyReadyBtn(){
+  var btn=document.getElementById('wa-notify-ready-btn');
+  if(!btn) return;
+  if(_rptCustFilter){
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
+}
+
 
 // ═══════════════════════════════════════════════════════════════════
 // SYNC — TWO-WAY GOOGLE SHEETS
@@ -1388,6 +1461,7 @@ function phoneKey(e){
   else if(e.key==='Escape'){list.classList.remove('on');}
 }
 
+
 // ═══════════════════════════════════════════════════════════════════
 // COLLECT ITEMS & SUBMIT
 // ═══════════════════════════════════════════════════════════════════
@@ -1406,7 +1480,6 @@ function collectItems(){
       var rm=rmEls[i]?rmEls[i].value.trim():'';
       serials.push({sn:sn,remark:rm,status:'PENDING',dateGiven:'',received:''});
     });
-    // If qty > 1 but only 1 blank serial entered, auto-expand into N separate pieces
     var allBlank = serials.length <= 1 && serials.every(function(s){return !s.sn;});
     if(allBlank && qty > 1){
       var sharedRemark = serials.length ? serials[0].remark : '';
@@ -1464,7 +1537,7 @@ async function submitEntry(){
 function _toastWithPrint(msg, entry){
   var t=document.getElementById('toast');
   var tmsg=document.getElementById('tmsg');
-  tmsg.innerHTML=msg+' &nbsp;<button onclick="printSlip(window._lastEntry)" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700;margin-left:4px">🖨 Print</button>';
+  tmsg.innerHTML=msg+' &nbsp;<button onclick="printSlip(window._lastEntry)" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700;margin-left:4px">&#128424; Print</button>';
   window._lastEntry=entry;
   t.style.background='var(--navy)';
   t.classList.add('on');
@@ -1561,7 +1634,7 @@ function renderLog(){
           : [{sn:'',remark:'',status:'PENDING',dateGiven:'',received:''}];
       }
 
-     var pcs = parseInt(it.qty) || 1;
+      var pcs = parseInt(it.qty) || 1;
       detailRows +=
         '<tr class="item-header-row">'
         +'<td colspan="5" style="padding:5px 10px 2px 18px;font-size:11.5px;font-weight:700;color:var(--navy2)">'
@@ -1612,10 +1685,10 @@ function renderLog(){
       +(e.remarks?'<span style="color:var(--muted);font-size:11px;font-style:italic">'+e.remarks+'</span>':'')
       +'</div></td>'
       +'<td style="padding:9px 10px 4px;text-align:right;white-space:nowrap">'
-      +'<button class="pbtn" onclick="printBySlip('+e.slip+')" title="Print">🖨</button>'
-      +'<button class="pbtn wa" onclick="waBySlip('+e.slip+')" title="WhatsApp">💬</button>'
-      +'<button class="pbtn ed" onclick="openEdit('+e.slip+')" title="Edit">✏</button>'
-      +'<button class="pbtn del" onclick="deleteSlip('+e.slip+')" title="Delete">🗑</button>'
+      +'<button class="pbtn" onclick="printBySlip('+e.slip+')" title="Print">&#128424;</button>'
+      +'<button class="pbtn wa" onclick="waBySlip('+e.slip+')" title="WhatsApp">&#128172;</button>'
+      +'<button class="pbtn ed" onclick="openEdit('+e.slip+')" title="Edit">&#9998;</button>'
+      +'<button class="pbtn del" onclick="deleteSlip('+e.slip+')" title="Delete">&#128465;</button>'
       +'</td></tr>'
       +'<tr class="item-cols-header">'
       +'<td style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;padding:3px 10px 3px 28px">Serial / Piece</td>'
@@ -1631,7 +1704,7 @@ function renderLog(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SERIAL FIELD SAVE — with auto WA on RECEIVED / GIVEN
+// SERIAL FIELD SAVE
 // ═══════════════════════════════════════════════════════════════════
 function saveSerialField(slip,ii,si,field,value){
   value=(value||'').trim();
@@ -1663,7 +1736,6 @@ function saveSerialField(slip,ii,si,field,value){
   renderStats();
   toast('Saved');
 
-  // ── AUTO WHATSAPP NOTIFY ──────────────────────────────────────────
   if(field==='status' && (value==='RECEIVED' || value==='GIVEN')){
     var itName=(e.items[ii]||{}).name||'';
     var snVal=s.sn||'';
@@ -1776,6 +1848,7 @@ function saveEdit(){
   renderLog();
   toast('Slip #'+_editSlip+' updated');
 }
+
 
 // ═══════════════════════════════════════════════════════════════════
 // PRINT
@@ -1937,6 +2010,8 @@ function renderReport(){
   });
 
   _lastReportRows = rows;
+  _updateNotifyReadyBtn();
+
   var total=rows.length,pend=0,given=0;
   rows.forEach(function(r){if(r.status==='GIVEN')given++;else pend++;});
   var cu=new Set(rows.map(function(r){return r.cname;})).size;
@@ -1952,7 +2027,8 @@ function renderReport(){
   var lastSlip='';
   tbody.innerHTML=rows.map(function(r){
     var isNew=(String(r.slip)!==String(lastSlip));lastSlip=String(r.slip);
-    var bc=r.status==='GIVEN'?'bg':'bp';
+    var bc=r.status==='GIVEN'?'bg':(r.status==='RECEIVED'?'bg':'bp');
+    var badgeColor=r.status==='GIVEN'?'bg':(r.status==='RECEIVED'?'':'bp');
     var tr=document.createElement('tr');
     if(isNew)tr.style.borderTop='2px solid #e0e4ef';
     tr.innerHTML='<td>'+(isNew?'<span class="sno">#'+r.slip+'</span>':'')+'</td>'
@@ -1963,14 +2039,21 @@ function renderReport(){
       +'<td style="font-size:11.5px">'+r.item+'</td>'
       +'<td style="font-family:monospace;font-size:11px">'+(r.sn||'—')+'</td>'
       +'<td style="font-size:11px;color:var(--red)">'+(r.issue||'')+'</td>'
-      +'<td><span class="badge '+bc+'">'+r.status+'</span></td>'
+      +'<td><span class="badge '+(r.status==='GIVEN'?'bg':'bp')+'">'+r.status+'</span></td>'
       +'<td style="font-size:11px">'+(r.dateGiven||'—')+'</td>'
       +'<td style="font-size:11px">'+(r.received||'—')+'</td>'
-      +'<td></td>';
+      +'<td style="white-space:nowrap"></td>';
+    // Print button
     var pBtn=document.createElement('button');
-    pBtn.className='pbtn';pBtn.textContent='🖨';
+    pBtn.className='pbtn';pBtn.textContent='&#128424;';pBtn.title='Print';
     pBtn.onclick=function(){printCustomerReport(r.cname);};
-    tr.querySelector('td:last-child').appendChild(pBtn);
+    // WA button (per-row: sends the full slip WA message for that slip)
+    var wBtn=document.createElement('button');
+    wBtn.className='pbtn wa';wBtn.textContent='&#128172;';wBtn.title='WhatsApp this slip';
+    wBtn.onclick=function(){waBySlip(r.slip);};
+    var td=tr.querySelector('td:last-child');
+    td.appendChild(pBtn);
+    td.appendChild(wBtn);
     return tr.outerHTML;
   }).join('');
 }
@@ -2252,7 +2335,7 @@ function initSync(){
 function showBackupInfo(){
   var log=loadLog(); var c=loadContacts();
   var el=document.getElementById('backup-info');
-  if(el)el.innerHTML='<b>Current data:</b> '+log.length+' slips &nbsp;·&nbsp; '+c.length+' contacts &nbsp;·&nbsp; '+loadItems().length+' items'
+  if(el)el.innerHTML='<b>Current data:</b> '+log.length+' slips &nbsp;&middot;&nbsp; '+c.length+' contacts &nbsp;&middot;&nbsp; '+loadItems().length+' items'
     +'<br><span style="color:var(--muted);font-size:11px">Tip: Download a backup every week and save to Google Drive or WhatsApp</span>';
 }
 
