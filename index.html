@@ -952,7 +952,7 @@ function buildStatusMsg(entry, itemName, sn, status, dateGiven){
   return null;
 }
 
-var _waBatch={};var _waToastTimer=null;
+var _waBatch={};
 
 function fireStatusWA(slip,itemName,sn,status,dateGiven){
   if(!loadWANotify())return;
@@ -964,62 +964,73 @@ function fireStatusWA(slip,itemName,sn,status,dateGiven){
   if(ph.length===10)ph='91'+ph;
   else if(ph.length===11&&ph[0]==='0')ph='91'+ph.slice(1);
   if(!ph||ph.length<12){toast('No phone on this slip — WA skipped',1);return;}
+
+  // Count total serials in this slip
+  var totalSerials=0;
+  (entry.items||[]).forEach(function(it){totalSerials+=(it.serials||[{sn:''}]).length;});
+
+  if(totalSerials===1){
+    // Single item slip — fire immediately
+    var msg=buildStatusMsg(entry,itemName,sn,status,dateGiven);
+    if(!msg)return;
+    window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
+    return;
+  }
+
+  // Multi-item slip — accumulate and show button
   if(!_waBatch[slip])_waBatch[slip]={phone:ph,entry:entry,items:[]};
   var ei=_waBatch[slip].items.findIndex(function(x){return x.sn===sn&&x.itemName===itemName;});
   if(ei>=0)_waBatch[slip].items[ei]={itemName:itemName,sn:sn,status:status,dateGiven:dateGiven};
   else _waBatch[slip].items.push({itemName:itemName,sn:sn,status:status,dateGiven:dateGiven});
-  if(_waBatch[slip].timer)clearTimeout(_waBatch[slip].timer);
-  _waBatch[slip].timer=setTimeout(function(){_flushWABatch(slip);},4000);
-  _showWASendToast(slip);
+  _renderWABatchBtn(slip);
 }
 
-function _showWASendToast(slip){
-  if(_waToastTimer)clearTimeout(_waToastTimer);
-  var t=document.getElementById('toast');
-  var count=0;
-  Object.keys(_waBatch).forEach(function(s){count+=(_waBatch[s].items||[]).length;});
-  document.getElementById('tmsg').innerHTML='📲 Sending WA in 4s ('+count+' item'+(count>1?'s':'')+')'
-    +'&nbsp;&nbsp;<button onclick="_flushWABatch(\''+slip+'\')" style="background:#25d366;border:none;'
-    +'color:#fff;padding:2px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700">Send Now</button>'
-    +'&nbsp;<button onclick="_cancelWABatch()" style="background:rgba(255,255,255,.15);border:none;'
-    +'color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700">✕</button>';
-  t.style.background='var(--navy)';t.classList.add('on');
-  _waToastTimer=setTimeout(function(){t.classList.remove('on');},5000);
-}
-
-function _cancelWABatch(){
-  Object.keys(_waBatch).forEach(function(s){if(_waBatch[s].timer)clearTimeout(_waBatch[s].timer);});
-  _waBatch={};
-  if(_waToastTimer)clearTimeout(_waToastTimer);
-  document.getElementById('toast').classList.remove('on');
+function _renderWABatchBtn(slip){
+  var batch=_waBatch[slip];
+  var count=batch?batch.items.length:0;
+  var btnId='wa-batch-btn-'+slip;
+  var existing=document.getElementById(btnId);
+  if(!existing){
+    var allHeaders=document.querySelectorAll('tr.slip-header-row');
+    allHeaders.forEach(function(row){
+      var sno=row.querySelector('.sno');
+      if(sno&&sno.textContent==='#'+slip){
+        var td=row.querySelector('td:last-child');
+        if(td){
+          var btn=document.createElement('button');
+          btn.id=btnId;
+          btn.className='pbtn wa';
+          btn.style.cssText='background:#25d366;color:#fff;border-color:#25d366;font-weight:700;padding:3px 10px';
+          btn.onclick=function(){_flushWABatch(slip);};
+          td.insertBefore(btn,td.firstChild);
+        }
+      }
+    });
+    existing=document.getElementById(btnId);
+  }
+  if(existing)existing.textContent='📲 Notify ('+count+')';
 }
 
 function _flushWABatch(slip){
   var batch=_waBatch[slip];if(!batch)return;
-  if(batch.timer)clearTimeout(batch.timer);
   delete _waBatch[slip];
+  var btn=document.getElementById('wa-batch-btn-'+slip);
+  if(btn)btn.remove();
   var items=batch.items;if(!items.length)return;
   var entry=batch.entry;var ph=batch.phone;var name=entry.cname||'Customer';
-  var msg;
-  if(items.length===1){
-    msg=buildStatusMsg(entry,items[0].itemName,items[0].sn,items[0].status,items[0].dateGiven);
-    if(!msg)return;
-  } else {
-    var allReady=items.every(function(x){return x.status==='RECEIVED';});
-    var allGiven=items.every(function(x){return x.status==='GIVEN';});
-    msg='Dear *'+name+'*,\n\n';
-    if(allReady)msg+='The following *'+items.length+' items* are ready for pickup:\n';
-    else if(allGiven)msg+='The following *'+items.length+' items* have been given to you:\n';
-    else msg+='Update on your *'+items.length+' items*:\n';
-    items.forEach(function(it,i){
-      msg+='\n  '+(i+1)+'. *'+it.itemName+'*';
-      if(it.sn)msg+=' (S/N: '+it.sn+')';
-      if(!allReady&&!allGiven){msg+=' — '+(it.status==='GIVEN'?'✅ Given':'📦 Ready');if(it.status==='GIVEN'&&it.dateGiven)msg+=' on '+it.dateGiven;}
-      else if(allGiven&&it.dateGiven)msg+=' on *'+it.dateGiven+'*';
-    });
-    msg+='\n\nKindly visit *SPYON* to collect at your convenience.\n\n— SPYON';
-  }
-  document.getElementById('toast').classList.remove('on');
+  var allReady=items.every(function(x){return x.status==='RECEIVED';});
+  var allGiven=items.every(function(x){return x.status==='GIVEN';});
+  var msg='Dear *'+name+'*,\n\n';
+  if(allReady)msg+='The following *'+items.length+' items* are ready for pickup:\n';
+  else if(allGiven)msg+='The following *'+items.length+' items* have been given to you:\n';
+  else msg+='Update on your *'+items.length+' items*:\n';
+  items.forEach(function(it,i){
+    msg+='\n  '+(i+1)+'. *'+it.itemName+'*';
+    if(it.sn)msg+=' (S/N: '+it.sn+')';
+    if(!allReady&&!allGiven){msg+=' — '+(it.status==='GIVEN'?'✅ Given':'📦 Ready');if(it.status==='GIVEN'&&it.dateGiven)msg+=' on '+it.dateGiven;}
+    else if(allGiven&&it.dateGiven)msg+=' on *'+it.dateGiven+'*';
+  });
+  msg+='\n\nKindly visit *SPYON* to collect at your convenience.\n\n— SPYON';
   window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
 }
 
