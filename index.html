@@ -979,9 +979,15 @@ function fireStatusWA(slip,itemName,sn,status,dateGiven){
 
   // Multi-item slip — accumulate and show button
   if(!_waBatch[slip])_waBatch[slip]={phone:ph,entry:entry,items:[]};
-  var ei=_waBatch[slip].items.findIndex(function(x){return x.sn===sn&&x.itemName===itemName;});
-  if(ei>=0)_waBatch[slip].items[ei]={itemName:itemName,sn:sn,status:status,dateGiven:dateGiven};
-  else _waBatch[slip].items.push({itemName:itemName,sn:sn,status:status,dateGiven:dateGiven});
+ if(sn){
+    // Has serial — deduplicate by itemName+sn
+    var ei=_waBatch[slip].items.findIndex(function(x){return x.sn===sn&&x.itemName===itemName;});
+    if(ei>=0)_waBatch[slip].items[ei]={itemName:itemName,sn:sn,status:status,dateGiven:dateGiven};
+    else _waBatch[slip].items.push({itemName:itemName,sn:sn,status:status,dateGiven:dateGiven});
+  } else {
+    // No serial — always add as new entry, no dedup
+    _waBatch[slip].items.push({itemName:itemName,sn:'',status:status,dateGiven:dateGiven});
+  }
   _renderWABatchBtn(slip);
 }
 
@@ -1024,8 +1030,20 @@ function _flushWABatch(slip){
   if(allReady)msg+='The following *'+items.length+' items* are ready for pickup:\n';
   else if(allGiven)msg+='The following *'+items.length+' items* have been given to you:\n';
   else msg+='Update on your *'+items.length+' items*:\n';
-  items.forEach(function(it,i){
+ // Group no-serial items by name, keep serial items individual
+  var grouped=[];var groupMap={};
+  items.forEach(function(it){
+    if(it.sn){
+      grouped.push({itemName:it.itemName,sn:it.sn,status:it.status,dateGiven:it.dateGiven,count:1});
+    } else {
+      var key=it.itemName+'|'+it.status;
+      if(groupMap[key]!==undefined){grouped[groupMap[key]].count++;}
+      else{groupMap[key]=grouped.length;grouped.push({itemName:it.itemName,sn:'',status:it.status,dateGiven:it.dateGiven,count:1});}
+    }
+  });
+  grouped.forEach(function(it,i){
     msg+='\n  '+(i+1)+'. *'+it.itemName+'*';
+    if(it.count>1)msg+=' x'+it.count+' pcs';
     if(it.sn)msg+=' (S/N: '+it.sn+')';
     if(!allReady&&!allGiven){msg+=' — '+(it.status==='GIVEN'?'✅ Given':'📦 Ready');if(it.status==='GIVEN'&&it.dateGiven)msg+=' on '+it.dateGiven;}
     else if(allGiven&&it.dateGiven)msg+=' on *'+it.dateGiven+'*';
