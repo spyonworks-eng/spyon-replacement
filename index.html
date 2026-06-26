@@ -1048,7 +1048,7 @@ function _flushWABatch(slip){
     if(!allReady&&!allGiven){msg+=' — '+(it.status==='GIVEN'?'✅ Given':'📦 Ready');if(it.status==='GIVEN'&&it.dateGiven)msg+=' on '+it.dateGiven;}
     else if(allGiven&&it.dateGiven)msg+=' on *'+it.dateGiven+'*';
   });
-  msg+='\n\nKindly visit *SPYON* to collect at your convenience.\n\n— SPYON';
+  if(allGiven){msg+='\n\n— SPYON';}else{msg+='\n\nKindly visit *SPYON* to collect at your convenience.\n\n— SPYON';}
   window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(msg),'_blank');
 }
 
